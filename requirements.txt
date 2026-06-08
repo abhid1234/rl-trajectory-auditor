@@ -1,0 +1,3 @@
+# Runtime: Python standard library only — nothing to install.
+# Dev only:
+#   pytest

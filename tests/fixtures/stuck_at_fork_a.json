@@ -1,0 +1,16 @@
+{
+  "task_id": "acme-fork-1", "repo": "acme/importer",
+  "task_description": "Resolve circular import",
+  "messages": [
+    {"role": "user", "content": "Fix the import error"},
+    {"role": "assistant", "content": "read_file: importer/__init__.py"},
+    {"role": "tool", "content": "agent inspected the module"},
+    {"role": "assistant", "content": "edit_file: importer/__init__.py"},
+    {"role": "tool", "content": "edited"},
+    {"role": "assistant", "content": "run_tests: pytest"},
+    {"role": "tool", "content": "1 failed"}
+  ],
+  "patch": "diff --git a/importer/__init__.py b/importer/__init__.py\n+import core\n",
+  "test_results": {"pred_passes_gen_tests": 0.0, "pred_passes_gold_tests": 0.0, "gen_tests_correct": 1.0},
+  "resolved": false, "model": "openhands-agent", "cost": 0.40
+}

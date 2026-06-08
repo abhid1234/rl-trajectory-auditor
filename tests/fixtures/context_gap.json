@@ -1,0 +1,14 @@
+{
+  "task_id": "acme-context-1", "repo": "acme/service",
+  "task_description": "Make the service boot",
+  "messages": [
+    {"role": "user", "content": "Get the service running"},
+    {"role": "assistant", "content": "execute_bash: cat config/settings.yaml"},
+    {"role": "tool", "content": "cat: config/settings.yaml: No such file or directory"},
+    {"role": "assistant", "content": "execute_bash: python -m service"},
+    {"role": "tool", "content": "FileNotFoundError: config/settings.yaml"}
+  ],
+  "patch": "",
+  "test_results": {"pred_passes_gen_tests": 0.0, "pred_passes_gold_tests": 0.0, "gen_tests_correct": 1.0},
+  "resolved": false, "model": "openhands-agent", "cost": 0.22
+}

@@ -1,0 +1,16 @@
+{
+  "task_id": "acme-clean-1", "repo": "acme/widgets",
+  "task_description": "Add None-guard to parse()",
+  "messages": [
+    {"role": "user", "content": "Handle None input in parse()"},
+    {"role": "assistant", "content": "read_file: widgets/parse.py"},
+    {"role": "tool", "content": "def parse(x): return x.value"},
+    {"role": "assistant", "content": "edit_file: widgets/parse.py"},
+    {"role": "tool", "content": "edited"},
+    {"role": "assistant", "content": "run_tests: pytest"},
+    {"role": "tool", "content": "5 passed"}
+  ],
+  "patch": "diff --git a/widgets/parse.py b/widgets/parse.py\n+    if x is None:\n+        return None\n",
+  "test_results": {"pred_passes_gen_tests": 1.0, "pred_passes_gold_tests": 1.0, "gen_tests_correct": 1.0},
+  "resolved": true, "model": "openhands-agent", "cost": 0.18
+}
