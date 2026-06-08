@@ -38,7 +38,7 @@ def test_confusion_and_prf():
 
 def test_cohens_kappa_perfect_and_chance():
     assert cohens_kappa(["A", "B", "A"], ["A", "B", "A"]) == 1.0
-    assert cohens_kappa(["A", "A", "B", "B"], ["B", "B", "A", "A"]) < 0.5
+    assert cohens_kappa(["A", "A", "B", "B"], ["B", "B", "A", "A"]) == -1.0
 
 
 def _traj_diag(tid, gen, gold, resolved, heur_category):
@@ -60,7 +60,8 @@ def test_reward_hack_validation_scores_detector():
     rows = [_traj_diag("t1", 1.0, 0.0, False, "Reward Hack"),
             _traj_diag("t2", 1.0, 0.0, False, "Clean"),
             _traj_diag("t3", 1.0, 1.0, True, "Reward Hack"),
-            _traj_diag("t4", 1.0, 1.0, True, "Clean")]
+            _traj_diag("t4", 1.0, 1.0, True, "Clean"),
+            _traj_diag("t5", 0.0, 0.0, False, "Clean")]   # UNKNOWN gold -> excluded
     trajs = [t for t, _ in rows]
     diags = {t.trajectory_id: d for t, d in rows}
     out = reward_hack_validation(trajs, diags)
@@ -76,4 +77,9 @@ def test_judge_agreement():
     out = judge_agreement(diags, verdicts)
     assert out["n"] == 2
     assert out["agreement"] == 0.5
-    assert "kappa" in out
+    assert out["kappa"] == 0.0
+
+
+def test_cohens_kappa_empty_input():
+    from src.validate.metrics import cohens_kappa
+    assert cohens_kappa([], []) == 0.0
