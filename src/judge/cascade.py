@@ -62,6 +62,8 @@ def select_for_judging(trajs: list[Trajectory], diags: dict[str, Diagnosis],
 
 def judge_cascade(trajs: list[Trajectory], diags: dict[str, Diagnosis], client,
                   guard: CostGuard, control_ratio: float = 0.1, seed: int = 13) -> dict:
+    # Returns {"verdicts": dict[str, JudgeVerdict], "judged": int, "skipped": int,
+    #          "errors": int, "est_input_tokens": int, "billed_tokens": int | None}
     chosen = select_for_judging(trajs, diags, control_ratio, seed)
     verdicts: dict[str, JudgeVerdict] = {}
     judged = skipped = errors = 0
@@ -78,6 +80,10 @@ def judge_cascade(trajs: list[Trajectory], diags: dict[str, Diagnosis], client,
         except Exception:
             errors += 1
         finally:
+            # record even on error — an attempted call still consumed budget
             guard.record(est_tokens)
+    # est_input_tokens = run-scoped estimate from the guard; billed_tokens = actual
+    # cumulative tokens the client reports (None if the client doesn't track them).
     return {"verdicts": verdicts, "judged": judged, "skipped": skipped, "errors": errors,
-            "total_tokens": getattr(client, "total_tokens", 0)}
+            "est_input_tokens": guard.input_tokens,
+            "billed_tokens": getattr(client, "total_tokens", None)}

@@ -36,7 +36,8 @@ def test_before_call_blocks_on_cost_ceiling():
 
 
 def _t(tid, diag):
-    traj = Trajectory.from_dict({"task_id": tid, "messages": [{"role": "user", "content": "hi"}],
+    traj = Trajectory.from_dict({"task_id": tid, "trajectory_id": tid,
+        "messages": [{"role": "user", "content": "hi"}],
         "patch": "", "test_results": {"pred_passes_gen_tests": 0.0, "pred_passes_gold_tests": 0.0},
         "resolved": False, "model": "m"})
     d = Diagnosis(tid, diag, "cat", 0.5, [], "fix", {})
@@ -97,3 +98,22 @@ def test_judge_cascade_respects_cost_guard():
     result = judge_cascade(trajs, diags, _StubClient(), guard, control_ratio=0.0, seed=1)
     assert result["judged"] == 2
     assert result["skipped"] == 3
+
+
+class _RaisingClient:
+    total_tokens = 0
+
+    def generate_json(self, prompt, schema):
+        raise RuntimeError("boom")
+
+
+def test_judge_cascade_counts_errors_and_still_records_budget():
+    items = [_t(f"f{i}", "TRAINING") for i in range(3)]
+    trajs = [t for t, _ in items]
+    diags = {t.trajectory_id: d for t, d in items}
+    guard = CostGuard(max_calls=10, max_input_tokens=10**9, max_cost_usd=15.0)
+    result = judge_cascade(trajs, diags, _RaisingClient(), guard, control_ratio=0.0, seed=1)
+    assert result["errors"] == 3
+    assert result["judged"] == 0
+    assert guard.calls == 3                 # finally recorded each attempted call
+    assert result["billed_tokens"] == 0     # client tracked 0
