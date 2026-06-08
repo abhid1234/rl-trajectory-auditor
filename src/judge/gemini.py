@@ -4,24 +4,12 @@ import os
 import time
 import urllib.request
 
-_API = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}"
+_API = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 DEFAULT_MODEL = "gemini-2.5-flash"
 
 
 class GeminiError(Exception):
     pass
-
-
-def _urllib_transport(url: str, body: dict) -> dict:
-    data = json.dumps(body).encode("utf-8")
-    req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
-    try:
-        with urllib.request.urlopen(req, timeout=60) as resp:
-            return json.loads(resp.read())
-    except urllib.error.HTTPError as e:  # noqa
-        raise GeminiError(f"HTTP {e.code}: {e.read()[:200]!r}")
-    except Exception as e:  # network/timeout
-        raise GeminiError(str(e))
 
 
 class GeminiClient:
@@ -31,14 +19,29 @@ class GeminiClient:
         self.model = model or os.environ.get("GEMINI_MODEL", DEFAULT_MODEL)
         if not self.api_key:
             raise GeminiError("GEMINI_API_KEY is not set")
-        self.transport = transport or _urllib_transport
+        self.transport = transport or self._default_transport
         self.max_retries = max_retries
         self.backoff_base = backoff_base
         self.total_tokens = 0
         self.last_usage = {}
 
     def _url(self) -> str:
-        return _API.format(model=self.model, key=self.api_key)
+        return _API.format(model=self.model)
+
+    def _default_transport(self, url: str, body: dict) -> dict:
+        # API key travels in the x-goog-api-key header, never in the URL.
+        data = json.dumps(body).encode("utf-8")
+        req = urllib.request.Request(
+            url, data=data,
+            headers={"Content-Type": "application/json", "x-goog-api-key": self.api_key},
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=60) as resp:
+                return json.loads(resp.read())
+        except urllib.error.HTTPError as e:  # noqa
+            raise GeminiError(f"HTTP {e.code}: {e.read()[:200]!r}")
+        except Exception as e:  # network/timeout — message contains no key (URL is key-free)
+            raise GeminiError(str(e))
 
     def generate_json(self, prompt: str, schema: dict) -> dict:
         body = {
