@@ -87,6 +87,17 @@ class Diagnosis:
 
 
 @dataclass
+class JudgeVerdict:
+    trajectory_id: str
+    diagnosis: str
+    failure_category: str
+    confidence: float
+    reasoning: str
+    offending_message_index: int | None
+    raw: dict = field(default_factory=dict)
+
+
+@dataclass
 class CorpusContext:
     tool_volume_mean: float
     tool_volume_stdev: float
