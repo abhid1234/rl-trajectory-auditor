@@ -5,7 +5,10 @@ from src.models import Trajectory, Diagnosis, JudgeVerdict
 from src.judge.prompt import build_judge_prompt, JUDGE_SCHEMA, parse_verdict
 
 CHARS_PER_TOKEN = 4                     # rough heuristic for estimation only
-FLASH_USD_PER_1K_TOKENS = 0.0003        # conservative Flash input price ($0.30 / 1M tokens)
+# ~4x conservative buffer over the actual Flash input price (~$0.075/1M tokens).
+# The buffer also absorbs untracked output-token cost: CostGuard bounds INPUT tokens
+# only, while the returned `billed_tokens` includes input + output.
+FLASH_USD_PER_1K_TOKENS = 0.0003
 
 
 def _tokens_from_chars(n_chars: int) -> int:
@@ -55,7 +58,7 @@ def select_for_judging(trajs: list[Trajectory], diags: dict[str, Diagnosis],
         else:
             clean.append(t)
     rng = random.Random(seed)
-    k = int(len(clean) * control_ratio)
+    k = min(int(len(clean) * control_ratio), len(clean))  # clamp: control_ratio may exceed 1.0
     control = rng.sample(clean, k) if k else []
     return flagged + control
 

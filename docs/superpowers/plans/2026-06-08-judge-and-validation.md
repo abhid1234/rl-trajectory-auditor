@@ -320,6 +320,12 @@ Pure stdlib. `GeminiClient.generate_json(prompt, schema)` returns a parsed dict 
 usage. A `transport` callable is injectable so tests never hit the network. The real transport uses
 `urllib`. The client also exposes `last_usage` / `total_tokens` for the CostGuard.
 
+> **Security note (applied during build):** the API key is sent via the `x-goog-api-key` HTTP
+> header, NOT in the URL query string (keys in URLs leak through logs/errors). The default
+> transport is therefore an instance method (`_default_transport`) that can read `self.api_key`;
+> the injectable seam stays a 2-arg `transport(url, body)` callable. The code block below shows the
+> original query-string form; the shipped version moves the key to the header.
+
 - [ ] **Step 1: Write the failing test**
 
 ```python
@@ -1022,7 +1028,7 @@ git add -A && git commit -m "chore: confirm Gemini live path (judge smoke)"
    build/truncation, schema, parser tolerance, Gemini client retry/backoff/usage (mocked), CostGuard
    ceilings, cascade selection + skip-on-budget, gold labels, and all validation math.
 2. **Mocked cascade dry-run shape:** the cascade returns `{verdicts, judged, skipped, errors,
-   total_tokens}`; confirm `skipped` rises when the CostGuard ceiling is low (covered by
+   est_input_tokens, billed_tokens}`; confirm `skipped` rises when the CostGuard ceiling is low (covered by
    `test_judge_cascade_respects_cost_guard`).
 3. **Optional live smoke (Task 8 Step 2):** one real Gemini call returns a schema-valid verdict and a
    token count — proves the real REST path and `responseSchema` before any at-scale spend.
