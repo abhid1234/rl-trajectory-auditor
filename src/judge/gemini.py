@@ -53,14 +53,15 @@ class GeminiClient:
         for attempt in range(self.max_retries):
             try:
                 resp = self.transport(self._url(), body)
+                text = resp["candidates"][0]["content"]["parts"][0]["text"]
+                result = json.loads(text)
                 usage = resp.get("usageMetadata", {})
                 self.last_usage = usage
                 self.total_tokens += int(usage.get("totalTokenCount", 0))
-                text = resp["candidates"][0]["content"]["parts"][0]["text"]
-                return json.loads(text)
+                return result
             except GeminiError as e:
                 last_err = e
-                if attempt < self.max_retries - 1 and self.backoff_base:
+                if attempt < self.max_retries - 1 and self.backoff_base is not None:
                     time.sleep(self.backoff_base * (2 ** attempt))
             except (KeyError, IndexError, json.JSONDecodeError) as e:
                 raise GeminiError(f"malformed response: {e}")

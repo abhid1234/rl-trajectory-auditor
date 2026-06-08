@@ -53,3 +53,27 @@ def test_generate_json_raises_after_max_retries():
 def test_missing_api_key_raises():
     with pytest.raises(GeminiError):
         GeminiClient(api_key="", model="m", transport=lambda u, b: {})
+
+
+def test_malformed_response_raises():
+    c = GeminiClient(api_key="k", model="m", transport=lambda u, b: {}, max_retries=3, backoff_base=0)
+    with pytest.raises(GeminiError):
+        c.generate_json("p", {"type": "object"})
+
+
+def test_url_is_key_free_and_has_model():
+    c = GeminiClient(api_key="secret123", model="gemini-flash", transport=lambda u, b: {})
+    url = c._url()
+    assert "gemini-flash" in url
+    assert "secret123" not in url
+    assert "key=" not in url
+
+
+def test_tokens_accumulate_across_calls():
+    def t(u, b):
+        return {"candidates": [{"content": {"parts": [{"text": "{}"}]}}],
+                "usageMetadata": {"totalTokenCount": 30}}
+    c = GeminiClient(api_key="k", model="m", transport=t)
+    c.generate_json("a", {"type": "object"})
+    c.generate_json("b", {"type": "object"})
+    assert c.total_tokens == 60
