@@ -3,6 +3,7 @@ the standard library, via the HF datasets-server /rows REST API (JSON, no parque
 from __future__ import annotations
 import json
 import os
+import time
 import urllib.parse
 import urllib.request
 
@@ -38,13 +39,25 @@ def normalize_row(api_row: dict) -> dict:
     }
 
 
-def _fetch_page(offset: int, length: int) -> list[dict]:
+def _fetch_page(offset: int, length: int, max_retries: int = 6, backoff: float = 2.0) -> list[dict]:
+    """Fetch one page of rows. Retries transient datasets-server failures
+    (502/503/429/timeouts) with exponential backoff — important for long multi-page
+    pulls where a single transient error would otherwise abort the whole run."""
     qs = urllib.parse.urlencode(
         {"dataset": DATASET, "config": "default", "split": "train",
          "offset": offset, "length": length})
-    req = urllib.request.Request(f"{BASE}?{qs}", headers={"User-Agent": "rl-traj-auditor"})
-    with urllib.request.urlopen(req, timeout=60) as resp:
-        return json.loads(resp.read()).get("rows", [])
+    url = f"{BASE}?{qs}"
+    last_err = None
+    for attempt in range(max_retries):
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "rl-traj-auditor"})
+            with urllib.request.urlopen(req, timeout=60) as resp:
+                return json.loads(resp.read()).get("rows", [])
+        except Exception as e:  # HTTPError/URLError/timeout — all transient-retryable here
+            last_err = e
+            if attempt < max_retries - 1 and backoff:
+                time.sleep(backoff * (2 ** attempt))
+    raise last_err
 
 
 def iter_normalized(limit: int = 100):
