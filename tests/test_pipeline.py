@@ -67,3 +67,18 @@ def test_pipeline_dry_run_estimate(tmp_path):
     # spend-gate guarantee: no output artifacts written on a dry run
     assert not (tmp_path / "audit_run.json").exists()
     assert not (tmp_path / "validation_report.json").exists()
+
+
+from src.pipeline.cli import build_parser, run_cli
+
+
+def test_cli_dry_run(tmp_path, capsys):
+    args = build_parser().parse_args(
+        ["audit", "--limit", "3", "--control", "0.0", "--max-cost", "12", "--dry-run",
+         "--work-dir", str(tmp_path / "t"), "--out-dir", str(tmp_path)])
+    rc = run_cli(args, row_source=_rows(), client=_StubClient())
+    assert rc == 0
+    captured = capsys.readouterr().out
+    assert "DRY RUN" in captured.upper()
+    assert "to judge" in captured.lower() or "to_judge" in captured.lower()
+    assert not (tmp_path / "audit_run.json").exists()
