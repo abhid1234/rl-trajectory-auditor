@@ -13,6 +13,15 @@ CREATE TABLE IF NOT EXISTS diagnoses (
     fix_recommendation TEXT,
     signals TEXT
 );
+CREATE TABLE IF NOT EXISTS judge_verdicts (
+    trajectory_id TEXT,
+    diagnosis TEXT,
+    failure_category TEXT,
+    confidence REAL,
+    reasoning TEXT,
+    offending_message_index INTEGER,
+    raw TEXT
+);
 """
 
 
@@ -29,6 +38,17 @@ class DiagnosisDB:
              json.dumps(d.evidence), d.fix_recommendation, json.dumps(d.signals)),
         )
         self.conn.commit()
+
+    def save_verdict(self, v) -> None:
+        self.conn.execute(
+            "INSERT INTO judge_verdicts VALUES (?,?,?,?,?,?,?)",
+            (v.trajectory_id, v.diagnosis, v.failure_category, v.confidence,
+             v.reasoning, v.offending_message_index, json.dumps(v.raw)),
+        )
+        self.conn.commit()
+
+    def verdicts(self) -> list[dict]:
+        return [dict(r) for r in self.conn.execute("SELECT * FROM judge_verdicts")]
 
     def all(self) -> list[dict]:
         return [dict(r) for r in self.conn.execute("SELECT * FROM diagnoses")]
