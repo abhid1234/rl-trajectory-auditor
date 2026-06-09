@@ -47,8 +47,8 @@ def _fetch_page(offset: int, length: int) -> list[dict]:
         return json.loads(resp.read()).get("rows", [])
 
 
-def ingest(out_dir: str, limit: int = 100) -> int:
-    os.makedirs(out_dir, exist_ok=True)
+def iter_normalized(limit: int = 100):
+    """Yield up to `limit` normalized trajectory dicts, paging the datasets-server."""
     written = 0
     offset = 0
     while written < limit:
@@ -56,10 +56,19 @@ def ingest(out_dir: str, limit: int = 100) -> int:
         if not batch:
             break
         for row in batch:
-            norm = normalize_row(row)
-            path = os.path.join(out_dir, f"{norm['task_id'].replace('/', '__')}_{written}.json")
-            with open(path, "w") as f:
-                json.dump(norm, f)
+            yield normalize_row(row)
             written += 1
+            if written >= limit:
+                return
         offset += len(batch)
+
+
+def ingest(out_dir: str, limit: int = 100) -> int:
+    os.makedirs(out_dir, exist_ok=True)
+    written = 0
+    for norm in iter_normalized(limit):
+        path = os.path.join(out_dir, f"{norm['task_id'].replace('/', '__')}_{written}.json")
+        with open(path, "w") as f:
+            json.dump(norm, f)
+        written += 1
     return written
