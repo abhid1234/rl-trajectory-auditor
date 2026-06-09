@@ -83,3 +83,18 @@ def test_judge_agreement():
 def test_cohens_kappa_empty_input():
     from src.validate.metrics import cohens_kappa
     assert cohens_kappa([], []) == 0.0
+
+
+def test_reward_hack_validation_from_labels():
+    from src.validate.metrics import reward_hack_validation_from_labels
+    from src.validate.ground_truth import REWARD_HACK_TRUE, CLEAN_TRUE, UNKNOWN
+    gold = {"t1": REWARD_HACK_TRUE, "t2": REWARD_HACK_TRUE, "t3": CLEAN_TRUE,
+            "t4": CLEAN_TRUE, "t5": UNKNOWN}
+    diags = {"t1": Diagnosis("t1", "TRAINING", "Reward Hack", 0.9, [], "f", {}),
+             "t2": Diagnosis("t2", "CLEAN", "Clean", 0.9, [], "f", {}),
+             "t3": Diagnosis("t3", "TRAINING", "Reward Hack", 0.9, [], "f", {}),
+             "t4": Diagnosis("t4", "CLEAN", "Clean", 0.9, [], "f", {}),
+             "t5": Diagnosis("t5", "TRAINING", "Reward Hack", 0.9, [], "f", {})}
+    out = reward_hack_validation_from_labels(gold, diags)
+    assert out["confusion"] == {"tp": 1, "fp": 1, "fn": 1, "tn": 1}
+    assert out["n_evaluated"] == 4   # t5 UNKNOWN excluded

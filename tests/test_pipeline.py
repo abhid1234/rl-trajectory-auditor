@@ -82,3 +82,17 @@ def test_cli_dry_run(tmp_path, capsys):
     assert "DRY RUN" in captured.upper()
     assert "to judge" in captured.lower() or "to_judge" in captured.lower()
     assert not (tmp_path / "audit_run.json").exists()
+
+
+def test_pipeline_resume_skips_already_judged(tmp_path):
+    work = str(tmp_path / "traj"); out = str(tmp_path); db = str(tmp_path / "exp.db")
+    g1 = CostGuard(max_calls=1, max_input_tokens=10**9, max_cost_usd=15.0)
+    r1 = run_audit_at_scale(limit=3, control_ratio=0.0, guard=g1, client=_StubClient(),
+                            row_source=_rows(), work_dir=work, out_dir=out, db_path=db)
+    assert r1["judge_stats"]["judged"] == 1
+    assert r1["judge_stats"]["skipped"] >= 1
+    g2 = CostGuard(max_calls=100, max_input_tokens=10**9, max_cost_usd=15.0)
+    r2 = run_audit_at_scale(limit=3, control_ratio=0.0, guard=g2, client=_StubClient(),
+                            row_source=_rows(), work_dir=work, out_dir=out, db_path=db)
+    assert len(r2["verdicts"]) == 2          # both flagged trajectories judged across runs
+    assert r2["judge_stats"]["judged"] == 1  # only the remaining one judged in run 2
