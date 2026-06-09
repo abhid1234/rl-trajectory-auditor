@@ -6,7 +6,7 @@ from src.loader import load_trajectories
 from src.corpus import CorpusBuilder
 from src.detectors import run_all
 from src.framework.four_point_diagnostic import diagnose
-from src.judge.cascade import judge_cascade, select_for_judging, CostGuard, _tokens_from_chars
+from src.judge.cascade import judge_cascade, select_for_judging, CostGuard
 from src.judge.gemini import GeminiClient
 from src.judge.prompt import build_judge_prompt
 from src.validate.metrics import reward_hack_validation, judge_agreement
@@ -37,6 +37,13 @@ def _verdict_to_dict(v) -> dict:
 def run_audit_at_scale(limit=5000, control_ratio=0.1, guard=None, client=None,
                        row_source=None, work_dir="trajectories", out_dir=".",
                        db_path=None, seed=13, dry_run=False) -> dict:
+    """Audit `limit` trajectories: heuristic pass, then judge cascade on the
+    flagged + control subset, then validation + artifacts.
+
+    dry_run=True stages trajectories to work_dir and computes a cost ESTIMATE
+    over the would-be-judged subset, then returns WITHOUT making any judge/API
+    call and WITHOUT writing audit_run.json / validation_report.json.
+    """
     guard = guard or CostGuard(max_calls=limit, max_input_tokens=10**9, max_cost_usd=12.0)
     row_source = row_source if row_source is not None else iter_normalized(limit)
 

@@ -48,13 +48,22 @@ def test_pipeline_end_to_end(tmp_path):
     assert vr["n"] == 3 and "reward_hack" in vr
 
 
+class _NoCallClient:
+    total_tokens = 0
+
+    def generate_json(self, prompt, schema):
+        raise AssertionError("dry-run must not call the judge")
+
+
 def test_pipeline_dry_run_estimate(tmp_path):
     guard = CostGuard(max_calls=100, max_input_tokens=10**9, max_cost_usd=15.0)
     est = run_audit_at_scale(
-        limit=3, control_ratio=0.0, guard=guard, client=_StubClient(),
+        limit=3, control_ratio=0.0, guard=guard, client=_NoCallClient(),
         row_source=_rows(), work_dir=str(tmp_path / "traj"),
         out_dir=str(tmp_path), db_path=str(tmp_path / "exp.db"), dry_run=True)
     assert est["dry_run"] is True
     assert est["to_judge"] >= 1
     assert "est_cost_usd" in est
+    # spend-gate guarantee: no output artifacts written on a dry run
     assert not (tmp_path / "audit_run.json").exists()
+    assert not (tmp_path / "validation_report.json").exists()
