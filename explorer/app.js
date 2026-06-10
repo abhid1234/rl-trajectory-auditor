@@ -166,24 +166,121 @@ function renderInspector() {
       <button id="b-off" class="on" title="jump to offending step">⚑ offending</button>
       <div class="rolef">${ROLES.map((r) => `<button class="rf fchip" data-r="${r}">${r}</button>`).join("")}</div>
       <div class="tsearch"><input id="tsearch" type="search" placeholder="search in trace…" autocomplete="off" /></div>
+      <button id="b-help" class="helpbtn" title="how to read this">? guide</button>
     </div>
 
     <div class="minimap" id="minimap"></div>
-    <div class="console" id="console"></div>
-
-    <div class="readout">
-      <div class="blk"><h3>Judge reasoning</h3><p class="reason">${esc(t.judge.reasoning || "—")}</p></div>
-      <div class="blk"><h3>Heuristic evidence</h3><ul>${
-        (t.heuristic.evidence && t.heuristic.evidence.length)
-          ? t.heuristic.evidence.map((e) => `<li>${esc(e)}</li>`).join("")
-          : `<li class="none">no heuristic signal</li>`
-      }</ul></div>
+    <div class="work">
+      <div class="console" id="console"></div>
+      <aside class="inspect" id="inspect"></aside>
     </div>`;
 
   wireControls();
+  computeEvents();
+  renderInspectPanel();
   renderMinimap();
   renderConsole();
   jumpTo(state.cursor, false);
+}
+
+/* ---- live inspection engine (audit-along) ------------------------------ */
+const CTX_RE = [
+  /No such file or directory/i, /command not found/i, /ModuleNotFoundError/i,
+  /Permission denied/i, /(could not|cannot|unable to) (find|locate|open|read)\b/i,
+  /\bENOENT\b/, /FileNotFoundError/i,
+  /missing (config|configuration|credential|environment variable|env var)/i,
+];
+const firstLine = (s) => (String(s || "").trim().split("\n")[0] || "").slice(0, 80);
+
+const DETECTORS = [
+  { key: "context_check", name: "context-check", color: "--d-HARNESS",
+    tip: "Scans tool outputs for signs the ENVIRONMENT withheld something the agent needed (missing file, config, module). When it fires, the failure is likely the harness — not the model.",
+    scan(t) { const ev = []; (t.messages || []).forEach((m) => {
+      if (m.role === "tool" || m.role === "user") { if (CTX_RE.some((re) => re.test(m.content || ""))) ev.push({ at: m.idx, text: firstLine(m.content) }); }
+    }); return ev; } },
+  { key: "reward_hack", name: "reward-hack", color: "--d-TRAINING",
+    tip: "Looks for SHORTCUTS: the patch edits a test file or hardcodes a return value. Surface signals — the LLM judge often overturns these by reading what the code actually does.",
+    scan(t) { const ev = [], p = t.patch || "", last = t.messages.length - 1;
+      if (/^\+\+\+ b\/.*(tests?\/|test_|_test\.py)/m.test(p)) ev.push({ at: last, text: "patch edits a test file, not source" });
+      if (/^\+\s*return\s+(["']?-?\d+["']?|["'].*["'])\s*(#.*)?$/m.test(p)) ev.push({ at: last, text: "patch hardcodes a literal return" });
+      return ev; } },
+  { key: "test_split", name: "test-split", color: "--d-TRAINING",
+    tip: "Compares the agent's OWN tests against the GOLD tests. self-pass + gold-fail = the run looks successful but isn't — the classic reward-hack signature.",
+    scan(t) { const s = t.test_split || {}; return (s.gen >= 1 && s.gold < 1) ? [{ at: t.messages.length - 1, text: `self-test ${s.gen} vs gold-test ${s.gold}` }] : []; } },
+  { key: "tool_volume", name: "tool-volume", color: "--d-PRODUCT",
+    tip: "Flags trajectories that use unusually MANY or FEW tool calls vs the corpus — a sign the agent thrashed or gave up early.",
+    scan(t) { const v = (t.heuristic.signals || {}).tool_volume; return (v === "high" || v === "low") ? [{ at: t.messages.length - 1, text: `tool volume is ${v} for this task` }] : []; } },
+  { key: "fork_pattern", name: "fork-pattern", color: "--d-BOTH",
+    tip: "Detects the agent repeating the SAME failing tool sequence that other traces in the same repo also get stuck on — a training-coverage gap.",
+    scan(t) { const f = (t.heuristic.signals || {}).fork_pattern; return f ? [{ at: t.messages.length - 1, text: `repeats failing sequence [${f}]` }] : []; } },
+];
+
+function computeEvents() {
+  const t = state.traj;
+  state.detEvents = {};                         // key -> [{at,text}]
+  state.events = [];                            // flat, sorted
+  DETECTORS.forEach((d) => {
+    const ev = d.scan(t) || [];
+    state.detEvents[d.key] = ev;
+    ev.forEach((e) => state.events.push({ ...e, det: d }));
+  });
+  state.events.sort((a, b) => a.at - b.at);
+  state.firedKeys = new Set();
+}
+
+function renderInspectPanel() {
+  const t = state.traj;
+  const dets = DETECTORS.map((d) => {
+    const fires = (state.detEvents[d.key] || []).length;
+    return `<div class="det" id="det-${d.key}" style="--c:var(${d.color})" data-fires="${fires}">` +
+      `<span class="ic"></span><span class="nm">${d.name}</span>` +
+      `<span class="st help" data-tip="${esc(d.tip)}">idle</span></div>`;
+  }).join("");
+
+  $("#inspect").innerHTML =
+    `<h3><span class="live"></span>What the auditor sees</h3>` +
+    `<div class="dets">${dets}</div>` +
+    `<h3>Signal tape</h3><div class="tape" id="tape"><span class="idle">step forward to watch detectors fire…</span></div>` +
+    `<h3>Verdict</h3>` +
+    `<div class="vbuild">` +
+      `<div class="vstep" id="vs-harness"><span class="q"><span class="n">1</span>Could a human solve this with the SAME context?</span><div class="a">— not yet</div></div>` +
+      `<div class="vstep" id="vs-training"><span class="q"><span class="n">2</span>Did it earn the score via a shortcut?</span><div class="a">— not yet</div></div>` +
+      `<div class="vstep" id="vs-fork"><span class="q"><span class="n">3</span>Does it fail at a repeated fork?</span><div class="a">— not yet</div></div>` +
+    `</div>` +
+    `<div class="vfinal">` +
+      `<div class="vrow d-${esc(t.heuristic.diagnosis)}"><span class="who">Heuristic</span><span class="dg">${esc(t.heuristic.diagnosis)}</span><span class="ct">${esc(t.heuristic.category)}</span></div>` +
+      `<div class="vconj">${t.agree ? "and the judge agreed" : "but the judge, reading the whole trace, said"}</div>` +
+      `<div class="vrow d-${esc(t.judge.diagnosis || "CLEAN")} ${"" /*reveal*/}"><span class="who">LLM judge</span><span class="dg">${esc(t.judge.diagnosis || "—")}</span><span class="ct">${esc(t.judge.category || "")}</span></div>` +
+      `<p class="vreason">${esc(t.judge.reasoning || "—")}</p>` +
+    `</div>`;
+  wireTips();
+}
+
+function updateInspection() {
+  if (!state.traj) return;
+  const cur = state.cursor;
+  // which detectors have fired by the cursor
+  const firedNow = new Set();
+  state.events.forEach((e) => { if (e.at <= cur) firedNow.add(e.det.key); });
+  DETECTORS.forEach((d) => {
+    const el = $(`#det-${d.key}`); if (!el) return;
+    const on = firedNow.has(d.key);
+    if (on && !el.classList.contains("fired")) { el.classList.add("fired", "flash"); setTimeout(() => el.classList.remove("flash"), 700); }
+    if (!on) el.classList.remove("fired");
+    const st = el.querySelector(".st"); if (st) st.textContent = on ? "fired" : "idle";
+  });
+  // signal tape: events up to cursor
+  const tape = $("#tape");
+  const shown = state.events.filter((e) => e.at <= cur);
+  tape.innerHTML = shown.length
+    ? shown.map((e) => `<div class="ev"><span class="at">[${e.at}]</span> <span class="dt" style="color:var(${e.det.color})">${e.det.name}</span> — ${esc(e.text)}</div>`).join("")
+    : `<span class="idle">no signals yet — keep stepping…</span>`;
+  tape.scrollTop = tape.scrollHeight;
+  // verdict steps
+  const setStep = (id, hit, txt) => { const el = $(id); if (!el) return; el.classList.toggle("hit", hit); el.querySelector(".a").textContent = hit ? txt : "— not yet"; };
+  setStep("#vs-harness", firedNow.has("context_check"), "YES → context withheld · HARNESS");
+  setStep("#vs-training", firedNow.has("reward_hack") || firedNow.has("test_split"), "YES → earned via shortcut · TRAINING");
+  setStep("#vs-fork", firedNow.has("fork_pattern"), "YES → repeated fork · TRAINING");
 }
 
 /* ---- console rendering ------------------------------------------------- */
@@ -266,7 +363,7 @@ function jumpTo(i, setCursor) {
   const n = state.traj.messages.length;
   i = Math.max(0, Math.min(n - 1, i));
   if (setCursor) state.cursor = i;
-  markCursor(); applyVisibility();
+  markCursor(); applyVisibility(); updateInspection();
   const el = $(`#turn-${i}`);
   if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
 }
@@ -289,7 +386,8 @@ function wireControls() {
   $("#b-step-f").onclick = () => { stopPlay(); step(1); };
   $("#b-step-b").onclick = () => { stopPlay(); step(-1); };
   $("#b-play").onclick = () => (state.playing ? stopPlay() : startPlay());
-  $("#b-all").onclick = () => { stopPlay(); state.cursor = state.traj.messages.length - 1; applyVisibility(); };
+  $("#b-all").onclick = () => { stopPlay(); state.cursor = state.traj.messages.length - 1; applyVisibility(); updateInspection(); };
+  const hb = $("#b-help"); if (hb) hb.onclick = openTour;
   $("#b-off").onclick = () => {
     const off = state.traj.judge.offending_index;
     if (Number.isInteger(off)) jumpTo(off, true);
@@ -310,6 +408,53 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "ArrowRight") { e.preventDefault(); stopPlay(); step(1); }
   else if (e.key === "ArrowLeft") { e.preventDefault(); stopPlay(); step(-1); }
   else if (e.key === " ") { e.preventDefault(); state.playing ? stopPlay() : startPlay(); }
+  else if (e.key === "?") openTour();
+  else if (e.key === "Escape") closeTour();
 });
 
+/* ---- tooltips ---------------------------------------------------------- */
+let tipEl = null;
+function wireTips() {
+  if (!tipEl) { tipEl = document.createElement("div"); tipEl.className = "tip"; document.body.appendChild(tipEl); }
+  $$("[data-tip]").forEach((el) => {
+    el.onmouseenter = () => {
+      tipEl.textContent = el.dataset.tip;
+      const r = el.getBoundingClientRect();
+      tipEl.style.left = Math.min(r.left, window.innerWidth - 260) + "px";
+      tipEl.style.top = (r.bottom + 8) + "px";
+      tipEl.classList.add("on");
+    };
+    el.onmouseleave = () => tipEl.classList.remove("on");
+  });
+}
+
+/* ---- guided tour ------------------------------------------------------- */
+const TOUR = [
+  { k: "What you're looking at", b: "Each entry is one real <b>RL agent trajectory</b> from a coding task — the full conversation between the agent and its environment. Roles are color-coded: <b style='color:#8a7c6e'>system</b>, <b style='color:#2f9e8e'>user</b>, <b style='color:#c89a4a'>assistant</b> (the agent's moves), <b style='color:#84b06a'>tool</b> (what the environment replied)." },
+  { k: "Step through it", b: "Use <b>▶ play</b> or the <b>← / →</b> keys to move through the trace one message at a time, like a debugger. The <b>minimap</b> (colored ticks) is a map of the whole run — click any tick to jump. The <b>red</b> tick is the step the judge flagged." },
+  { k: "Watch the audit run live", b: "As you step, the right panel — <b>What the auditor sees</b> — lights up its detectors the moment each one fires, and logs <i>why</i>. That's the heuristic auditor working in real time: context-check, reward-hack, test-split, and more." },
+  { k: "Heuristic vs. judge", b: "The <b>Verdict</b> builds from those signals into the heuristic's call — then the <b>LLM judge</b>, which read the whole trace, gives its own. Where they <b>disagree</b> is the interesting part: the judge is usually closer to the truth. That's the whole point." },
+];
+let tourI = 0;
+function openTour() { tourI = 0; paintTour(); }
+function closeTour() { const t = $("#tour"); if (t) t.remove(); }
+function paintTour() {
+  closeTour();
+  const s = TOUR[tourI];
+  const ov = document.createElement("div");
+  ov.className = "tour"; ov.id = "tour";
+  ov.innerHTML =
+    `<div class="tourcard"><div class="tc-hd"><div class="tc-k">Guide · ${tourI + 1} of ${TOUR.length}</div><h2>${s.k}</h2></div>` +
+    `<div class="tc-bd">${s.b}</div>` +
+    `<div class="tc-ft"><div class="dots">${TOUR.map((_, i) => `<i class="${i === tourI ? "on" : ""}"></i>`).join("")}</div><span class="grow"></span>` +
+    `<button class="ghost" id="t-skip">skip</button><button id="t-next">${tourI < TOUR.length - 1 ? "next ›" : "got it"}</button></div></div>`;
+  ov.onclick = (e) => { if (e.target === ov) closeTour(); };
+  document.body.appendChild(ov);
+  $("#t-skip").onclick = closeTour;
+  $("#t-next").onclick = () => { if (tourI < TOUR.length - 1) { tourI++; paintTour(); } else { try { localStorage.setItem("rlta_tour", "1"); } catch (e) {} closeTour(); } };
+}
+
 boot();
+try {
+  if (!location.search.includes("notour") && !localStorage.getItem("rlta_tour")) setTimeout(openTour, 600);
+} catch (e) {}

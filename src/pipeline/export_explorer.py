@@ -192,7 +192,7 @@ def build_full_explorer(audit_run: dict, work_dir: str, out_dir: str, max_cards:
             "model": t.get("model", ""),
             "heuristic": {"diagnosis": d["diagnosis"], "category": d["failure_category"],
                           "confidence": d["confidence"], "evidence": d.get("evidence", []),
-                          "fix": d.get("fix_recommendation", "")},
+                          "signals": d.get("signals", {}), "fix": d.get("fix_recommendation", "")},
             "judge": {"diagnosis": v.get("diagnosis"), "category": v.get("failure_category"),
                       "confidence": v.get("confidence"), "reasoning": v.get("reasoning", ""),
                       "offending_index": v.get("offending_message_index")},
