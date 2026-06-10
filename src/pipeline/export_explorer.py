@@ -108,7 +108,7 @@ def _compute_summary(diags: dict, verds: dict, report: dict, val: dict, staged: 
                       "kappa": val.get("judge_agreement", {}).get("kappa"),
                       "n": val.get("judge_agreement", {}).get("n")},
         "headline": ("Heuristics over-flag reward-hacking; an LLM judge that reads the trace "
-                     "is more precise and corrects ~4 of 5 false alarms."),
+                     f"corrects {corrects_pct}% of those false alarms."),
     }
 
 
@@ -160,13 +160,36 @@ def build_explorer_data(audit_run: dict, work_dir: str, out_dir: str, max_cards:
     return summary, cards
 
 
+def _stream_staged_light(work_dir: str):
+    """Stream staged files once: return (light, path_by_id) where `light` holds only
+    test_results + resolved per trajectory (small) and `path_by_id` maps id -> file path.
+    Never retains message text — safe for very large corpora."""
+    light, path_by_id = {}, {}
+    if work_dir and os.path.isdir(work_dir):
+        for name in os.listdir(work_dir):
+            if not name.endswith(".json"):
+                continue
+            p = os.path.join(work_dir, name)
+            try:
+                r = json.load(open(p))
+            except (ValueError, OSError):
+                continue
+            tid = r.get("trajectory_id", r.get("task_id"))
+            light[tid] = {"test_results": r.get("test_results", {}), "resolved": r.get("resolved")}
+            path_by_id[tid] = p
+    return light, path_by_id
+
+
 def build_full_explorer(audit_run: dict, work_dir: str, out_dir: str, max_cards: int = 200):
-    """Emit the inspector dataset: summary.json + index.json + traj/<id>.json (full traces)."""
-    staged = _load_staged(work_dir)
+    """Emit the inspector dataset: summary.json + index.json + traj/<id>.json (full traces).
+
+    Memory-safe: the staged corpus is streamed once for a light test-result map, and
+    full message data is loaded one trajectory at a time only for the curated subset."""
+    light, path_by_id = _stream_staged_light(work_dir)
     diags = {d["trajectory_id"]: d for d in audit_run.get("diagnoses", [])}
     verds = audit_run.get("verdicts", {})
     summary = _compute_summary(diags, verds, audit_run.get("report", {}),
-                               audit_run.get("validation", {}), staged)
+                               audit_run.get("validation", {}), light)
 
     chosen = _curate_ids(diags, verds, max_cards)
     traj_dir = os.path.join(out_dir, "traj")
@@ -176,7 +199,12 @@ def build_full_explorer(audit_run: dict, work_dir: str, out_dir: str, max_cards:
     for tid in chosen:
         d = diags[tid]
         v = verds.get(tid, {})
-        t = staged.get(tid, {})
+        t = {}
+        if tid in path_by_id:
+            try:
+                t = json.load(open(path_by_id[tid]))
+            except (ValueError, OSError):
+                t = {}
         tr = (t.get("test_results") or {})
         msgs = _full_messages(t, v.get("offending_message_index"))
         agree = bool(v) and v.get("diagnosis") == d["diagnosis"]
