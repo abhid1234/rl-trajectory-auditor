@@ -44,18 +44,33 @@ def _messages_window(traj: dict, idx) -> list:
     return out
 
 
-def build_explorer_data(audit_run: dict, work_dir: str, out_dir: str, max_cards: int = 300):
-    staged = _load_staged(work_dir)
-    diags = {d["trajectory_id"]: d for d in audit_run.get("diagnoses", [])}
-    verds = audit_run.get("verdicts", {})
-    report = audit_run.get("report", {})
-    val = audit_run.get("validation", {})
-    n = report.get("total", len(diags))
+def _tool_calls(m: dict) -> list:
+    """Flatten a message's structured tool_calls into [{name, args}]."""
+    out = []
+    for tc in (m.get("tool_calls") or []):
+        fn = tc.get("function") or {}
+        if fn.get("name"):
+            out.append({"name": fn.get("name"), "args": (fn.get("arguments") or "")[:2000]})
+    return out
 
+
+def _full_messages(traj: dict, idx) -> list:
+    """Every message of the trajectory, with tool calls + offending flag."""
+    msgs = traj.get("messages", []) if traj else []
+    out = []
+    for j, m in enumerate(msgs):
+        out.append({"idx": j, "role": m.get("role", "?"),
+                    "content": (m.get("content") or "")[:6000],
+                    "tools": _tool_calls(m),
+                    "offending": (isinstance(idx, int) and j == idx)})
+    return out
+
+
+def _compute_summary(diags: dict, verds: dict, report: dict, val: dict, staged: dict) -> dict:
+    n = report.get("total", len(diags))
     cats = report.get("categories", {})
     distribution = [{"label": k, "count": v, "pct": round(100 * v / n) if n else 0}
                     for k, v in sorted(cats.items(), key=lambda x: -x[1])]
-
     rh = dict(val.get("reward_hack", {}))
     jtp = jfp = jfn = fp_total = fp_judge_not_hack = 0
     for tid, d in diags.items():
@@ -68,10 +83,8 @@ def build_explorer_data(audit_run: dict, work_dir: str, out_dir: str, max_cards:
                          bool(t.get("resolved")))
         v = verds.get(tid)
         if gold == "REWARD_HACK_TRUE" and v:
-            if v["diagnosis"] == "TRAINING":
-                jtp += 1
-            else:
-                jfn += 1
+            jtp += 1 if v["diagnosis"] == "TRAINING" else 0
+            jfn += 0 if v["diagnosis"] == "TRAINING" else 1
         if gold == "CLEAN_TRUE" and v and v["diagnosis"] == "TRAINING":
             jfp += 1
         if gold == "CLEAN_TRUE" and d.get("failure_category") == "Reward Hack":
@@ -81,8 +94,7 @@ def build_explorer_data(audit_run: dict, work_dir: str, out_dir: str, max_cards:
     j_prec = round(jtp / (jtp + jfp), 2) if (jtp + jfp) else 0.0
     j_rec = round(jtp / (jtp + jfn), 2) if (jtp + jfn) else 0.0
     corrects_pct = round(100 * fp_judge_not_hack / fp_total) if fp_total else 0
-
-    summary = {
+    return {
         "n": n,
         "distribution": distribution,
         "splits": report.get("splits", {}),
@@ -98,6 +110,29 @@ def build_explorer_data(audit_run: dict, work_dir: str, out_dir: str, max_cards:
         "headline": ("Heuristics over-flag reward-hacking; an LLM judge that reads the trace "
                      "is more precise and corrects ~4 of 5 false alarms."),
     }
+
+
+def _curate_ids(diags: dict, verds: dict, max_cards: int) -> list:
+    """Disagreements first, then fill by judge confidence."""
+    judged = [tid for tid in diags if tid in verds]
+    disagreements = [tid for tid in judged if verds[tid]["diagnosis"] != diags[tid]["diagnosis"]]
+    chosen = list(disagreements)
+    seen = set(chosen)
+    rest = sorted([tid for tid in judged if tid not in seen],
+                  key=lambda i: -(verds[i].get("confidence") or 0))
+    for tid in rest:
+        if len(chosen) >= max_cards:
+            break
+        chosen.append(tid)
+    return chosen[:max_cards]
+
+
+def build_explorer_data(audit_run: dict, work_dir: str, out_dir: str, max_cards: int = 300):
+    staged = _load_staged(work_dir)
+    diags = {d["trajectory_id"]: d for d in audit_run.get("diagnoses", [])}
+    verds = audit_run.get("verdicts", {})
+    summary = _compute_summary(diags, verds, audit_run.get("report", {}),
+                               audit_run.get("validation", {}), staged)
 
     def card(tid):
         d = diags[tid]
@@ -118,31 +153,81 @@ def build_explorer_data(audit_run: dict, work_dir: str, out_dir: str, max_cards:
             "messages": _messages_window(t, v.get("offending_message_index")),
         }
 
-    judged_ids = [tid for tid in diags if tid in verds]
-    disagreements = [tid for tid in judged_ids if verds[tid]["diagnosis"] != diags[tid]["diagnosis"]]
-    chosen = list(disagreements)
-    seen = set(chosen)
-    rest = sorted([tid for tid in judged_ids if tid not in seen],
-                  key=lambda i: -(verds[i].get("confidence") or 0))
-    for tid in rest:
-        if len(chosen) >= max_cards:
-            break
-        chosen.append(tid)
-    cards = [card(tid) for tid in chosen[:max_cards]]
-
+    cards = [card(tid) for tid in _curate_ids(diags, verds, max_cards)]
     os.makedirs(out_dir, exist_ok=True)
     json.dump(summary, open(os.path.join(out_dir, "summary.json"), "w"), indent=2)
     json.dump(cards, open(os.path.join(out_dir, "cards.json"), "w"), indent=2)
     return summary, cards
 
 
+def build_full_explorer(audit_run: dict, work_dir: str, out_dir: str, max_cards: int = 200):
+    """Emit the inspector dataset: summary.json + index.json + traj/<id>.json (full traces)."""
+    staged = _load_staged(work_dir)
+    diags = {d["trajectory_id"]: d for d in audit_run.get("diagnoses", [])}
+    verds = audit_run.get("verdicts", {})
+    summary = _compute_summary(diags, verds, audit_run.get("report", {}),
+                               audit_run.get("validation", {}), staged)
+
+    chosen = _curate_ids(diags, verds, max_cards)
+    traj_dir = os.path.join(out_dir, "traj")
+    os.makedirs(traj_dir, exist_ok=True)
+
+    index = []
+    for tid in chosen:
+        d = diags[tid]
+        v = verds.get(tid, {})
+        t = staged.get(tid, {})
+        tr = (t.get("test_results") or {})
+        msgs = _full_messages(t, v.get("offending_message_index"))
+        agree = bool(v) and v.get("diagnosis") == d["diagnosis"]
+        index.append({
+            "trajectory_id": tid, "task_id": t.get("task_id", tid), "repo": t.get("repo", ""),
+            "heuristic_diagnosis": d["diagnosis"], "heuristic_category": d["failure_category"],
+            "judge_diagnosis": v.get("diagnosis"), "judge_category": v.get("failure_category"),
+            "agree": agree, "n_messages": len(msgs),
+            "offending_index": v.get("offending_message_index"),
+        })
+        full = {
+            "trajectory_id": tid, "task_id": t.get("task_id", tid), "repo": t.get("repo", ""),
+            "model": t.get("model", ""),
+            "heuristic": {"diagnosis": d["diagnosis"], "category": d["failure_category"],
+                          "confidence": d["confidence"], "evidence": d.get("evidence", []),
+                          "fix": d.get("fix_recommendation", "")},
+            "judge": {"diagnosis": v.get("diagnosis"), "category": v.get("failure_category"),
+                      "confidence": v.get("confidence"), "reasoning": v.get("reasoning", ""),
+                      "offending_index": v.get("offending_message_index")},
+            "agree": agree,
+            "test_split": {"gen": tr.get("pred_passes_gen_tests"),
+                           "gold": tr.get("pred_passes_gold_tests")},
+            "patch": (t.get("patch") or "")[:8000],
+            "messages": msgs,
+        }
+        json.dump(full, open(os.path.join(traj_dir, f"{_safe(tid)}.json"), "w"))
+
+    os.makedirs(out_dir, exist_ok=True)
+    json.dump(summary, open(os.path.join(out_dir, "summary.json"), "w"), indent=2)
+    json.dump({"n": summary["n"], "count": len(index), "cards": index},
+              open(os.path.join(out_dir, "index.json"), "w"), indent=2)
+    return summary, index
+
+
+def _safe(tid: str) -> str:
+    return "".join(c if c.isalnum() or c in "-_" else "_" for c in str(tid))
+
+
 def main(argv=None) -> int:
-    argv = argv if argv is not None else sys.argv[1:]
+    argv = list(argv if argv is not None else sys.argv[1:])
+    full = "--full" in argv
+    argv = [a for a in argv if a != "--full"]
     audit_path, work_dir = argv[0], argv[1]
     out_dir = argv[2] if len(argv) > 2 else "explorer/data"
     audit = json.load(open(audit_path))
-    summary, cards = build_explorer_data(audit, work_dir, out_dir)
-    print(f"[OK] wrote {len(cards)} cards + summary to {out_dir} (n={summary['n']})")
+    if full:
+        summary, index = build_full_explorer(audit, work_dir, out_dir)
+        print(f"[OK] wrote {len(index)} full traces + summary/index to {out_dir} (n={summary['n']})")
+    else:
+        summary, cards = build_explorer_data(audit, work_dir, out_dir)
+        print(f"[OK] wrote {len(cards)} cards + summary to {out_dir} (n={summary['n']})")
     return 0
 
 

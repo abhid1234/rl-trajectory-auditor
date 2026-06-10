@@ -1,5 +1,5 @@
 import json
-from src.pipeline.export_explorer import build_explorer_data, _gold_for
+from src.pipeline.export_explorer import build_explorer_data, build_full_explorer, _gold_for
 
 
 def _audit():
@@ -57,3 +57,21 @@ def test_gold_helper():
     assert _gold_for(1.0, 0.0, False) == "REWARD_HACK_TRUE"
     assert _gold_for(1.0, 1.0, True) == "CLEAN_TRUE"
     assert _gold_for(0.0, 0.0, False) == "UNKNOWN"
+
+
+def test_build_full_explorer_writes_index_and_traces(tmp_path):
+    work = _stage(tmp_path)
+    out = str(tmp_path / "data")
+    summary, index = build_full_explorer(_audit(), work, out, max_cards=50)
+    import os, json as _j
+    # index + per-trajectory file
+    idx = _j.load(open(out + "/index.json"))
+    assert idx["count"] == len(index) >= 1
+    a = next(c for c in idx["cards"] if c["trajectory_id"] == "a")
+    assert a["agree"] is False and a["n_messages"] == 3
+    full = _j.load(open(out + "/traj/a.json"))
+    assert full["judge"]["diagnosis"] == "CLEAN"
+    assert len(full["messages"]) == 3                    # FULL trace, not a window
+    off = [m for m in full["messages"] if m["offending"]]
+    assert len(off) == 1 and off[0]["idx"] == 1
+    assert os.path.exists(out + "/summary.json")

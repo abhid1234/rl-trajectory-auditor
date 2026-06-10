@@ -3,70 +3,50 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>RL Trajectory Auditor — Explorer</title>
-<meta name="description" content="Browse real RL agent trajectories audited for failure mode: where a cheap heuristic and an LLM judge disagree on why a run failed." />
+<title>RL Trajectory Auditor — Inspector</title>
+<meta name="description" content="Step through real RL agent trajectories and see where a heuristic and an LLM judge disagree on why a run failed." />
+<link rel="preload" href="fonts/jetbrains-mono-400.woff2" as="font" type="font/woff2" crossorigin />
 <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-<div class="wrap">
+<div class="app">
 
-  <header class="masthead">
-    <p class="kicker">RL Trajectory Auditor · Field Report</p>
-    <h1>Nobody reads their <em>trajectories</em>.</h1>
-    <div class="dateline">
-      <span>SOURCE&nbsp; <b>nebius/SWE-rebench-openhands-trajectories</b></span>
-      <span>JUDGE&nbsp; <b>Gemini 2.5 Flash</b></span>
-      <span>AUDITED&nbsp; <b id="dl-n">—</b></span>
+  <header class="topbar">
+    <div class="brand">
+      <span class="k">RL Trajectory Auditor</span>
+      <h1>The <em>Inspector</em></h1>
+    </div>
+    <div class="metric">
+      <span class="lab">Heuristic precision</span>
+      <span class="v" id="m-h">—</span>
+    </div>
+    <div class="metric judge">
+      <span class="lab">Judge precision</span>
+      <span class="v" id="m-j">—</span>
+    </div>
+    <div class="metric">
+      <span class="lab">Judge overturns</span>
+      <span class="v"><b id="m-c">—</b> <small>of heuristic false alarms</small></span>
+    </div>
+    <span class="grow"></span>
+    <div class="src">
+      <div>source <b>nebius/SWE-rebench-openhands</b></div>
+      <div>judge <b>Gemini 2.5 Flash</b> · audited <b id="m-n">—</b></div>
     </div>
   </header>
 
-  <p class="lede" id="lede">…</p>
+  <div class="body">
+    <aside class="rail">
+      <div class="search"><input id="railsearch" type="search" placeholder="search task / repo…" autocomplete="off" /></div>
+      <div class="filters" id="railfilters"></div>
+      <div class="list" id="raillist"></div>
+      <div class="count" id="railcount">—</div>
+    </aside>
 
-  <section class="dash">
-    <div class="panel">
-      <h2>Reward-hack detector · precision</h2>
-      <div class="faceoff">
-        <div class="col heuristic">
-          <div class="lab">Heuristic</div>
-          <div class="val" id="h-prec">—</div>
-          <div class="sub">flags everything…</div>
-        </div>
-        <div class="arrow">▶</div>
-        <div class="col judge">
-          <div class="lab">LLM judge</div>
-          <div class="val" id="j-prec">—</div>
-          <div class="sub">…reads the trace</div>
-        </div>
-      </div>
-      <div class="bigstat">
-        <span class="num" id="corrects">—</span>
-        <span class="txt">of the heuristic's <b id="fp">—</b> false alarms are<br/>overturned by the judge, toward ground truth.</span>
-      </div>
-      <p class="footnote" id="agree-note">…</p>
-    </div>
-
-    <div class="panel">
-      <h2>Failure distribution</h2>
-      <div class="dist" id="dist"></div>
-      <p class="footnote">Heuristic categories. The judge, reading each trace, re-labels many
-        of these — which is the whole point.</p>
-    </div>
-  </section>
-
-  <div class="controls">
-    <div class="chips" id="filters"></div>
-    <span class="spacer"></span>
-    <span class="counter" id="counter">—</span>
-    <button class="nav-btn" id="prev" title="Previous (←)">‹</button>
-    <button class="nav-btn" id="next" title="Next (→)">›</button>
+    <main class="insp" id="insp">
+      <div class="empty">Select a trajectory to inspect.</div>
+    </main>
   </div>
-
-  <main class="stage" id="stage"></main>
-
-  <footer class="foot">
-    <span>A forensic audit of RL agent training traces.</span>
-    <span>Method &amp; numbers in the <a href="https://github.com/" id="repo-link">project README</a>.</span>
-  </footer>
 
 </div>
 <script src="app.js"></script>
