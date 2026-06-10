@@ -159,7 +159,7 @@ function renderInspector() {
     <div class="ctrl">
       <div class="seg">
         <button id="b-step-b" title="step back (←)">‹ step</button>
-        <button id="b-play" title="play / pause (space)">▶ play</button>
+        <button id="b-play" class="run" title="run the inspection from the start (space)">▶ Run step-by-step</button>
         <button id="b-step-f" title="step forward (→)">step ›</button>
       </div>
       <button id="b-all" title="reveal whole trace">show all</button>
@@ -239,6 +239,7 @@ function renderInspectPanel() {
 
   $("#inspect").innerHTML =
     `<h3><span class="live"></span>What the auditor sees</h3>` +
+    `<div class="hint">Press <b>▶ Run step-by-step</b> (or <b>→</b>) — each detector fires the moment the trace reaches its trigger.</div>` +
     `<div class="dets">${dets}</div>` +
     `<h3>Signal tape</h3><div class="tape" id="tape"><span class="idle">step forward to watch detectors fire…</span></div>` +
     `<h3>Verdict</h3>` +
@@ -369,16 +370,18 @@ function jumpTo(i, setCursor) {
 }
 function step(d) { state.cursor = Math.max(0, Math.min(state.traj.messages.length - 1, state.cursor + d)); jumpTo(state.cursor, false); }
 function startPlay() {
+  // restart the walkthrough from the top if we're already at the end
+  if (state.cursor >= state.traj.messages.length - 1) { state.cursor = 0; jumpTo(0, false); }
   state.playing = true; $("#b-play").textContent = "❚❚ pause"; $("#b-play").classList.add("on");
   applyVisibility();
   state.timer = setInterval(() => {
     if (state.cursor >= state.traj.messages.length - 1) { stopPlay(); return; }
     state.cursor++; jumpTo(state.cursor, false);
-  }, 750);
+  }, 700);
 }
 function stopPlay() {
   state.playing = false; clearInterval(state.timer); state.timer = null;
-  const b = $("#b-play"); if (b) { b.textContent = "▶ play"; b.classList.remove("on"); }
+  const b = $("#b-play"); if (b) { b.textContent = "▶ Run step-by-step"; b.classList.remove("on"); }
   applyVisibility();
 }
 
