@@ -21,7 +21,7 @@ anyone can scroll the receipts.
 - **Wow type:** both a real finding AND a shareable artifact; full push to launch.
 - **Constraints:** core auditor stays stdlib; deep tier may add an LLM judge + a web explorer.
 - **LLM judge:** Google **Gemini Flash**, called via **stdlib `urllib` REST** (avoids the corp
-  pip airlock; matches the existing `/research` pattern). Key from `GEMINI_API_KEY` (env or a
+  pip policy; matches the existing `/research` pattern). Key from `GEMINI_API_KEY` (env or a
   project-local `.env`, never committed). Model id configurable (`GEMINI_MODEL`), default a
   Flash model; the client may call ListModels at runtime to resolve a valid id.
 - **Budget:** hard cap **under $15 total**. Flash is cheap enough that pull-time, not money, is

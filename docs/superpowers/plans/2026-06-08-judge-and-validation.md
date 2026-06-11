@@ -20,7 +20,7 @@ and (2) a **validation harness** that measures the heuristic reward-hack detecto
 dataset's `resolved` ground truth and quantifies heuristic-vs-judge agreement.
 
 Per the design spec (`docs/superpowers/specs/2026-06-08-big-audit-design.md`): Gemini is called via
-stdlib REST (corp pip airlock blocks `google-genai`); `GEMINI_API_KEY`/`GEMINI_MODEL` come from the
+stdlib REST (local pip policy blocks `google-genai`); `GEMINI_API_KEY`/`GEMINI_MODEL` come from the
 environment or a project-local `.env`; spend is hard-capped under $15; the diagnosis vocabulary
 stays identical to v0.1 (`HARNESS | TRAINING | PRODUCT | BOTH | CLEAN`).
 
