@@ -54,6 +54,22 @@ def reward_hack_validation(trajs: list[Trajectory], diags: dict[str, Diagnosis])
     return {"confusion": cm, **precision_recall_f1(cm), "n_evaluated": len(y_true)}
 
 
+def reward_hack_validation_from_labels(gold_by_id: dict[str, str],
+                                       diags: dict[str, Diagnosis]) -> dict:
+    """Same metric as reward_hack_validation but driven by precomputed gold labels
+    (so the memory-bounded pipeline need not retain Trajectory objects)."""
+    y_true, y_pred = [], []
+    for tid, gold in gold_by_id.items():
+        if gold == UNKNOWN:
+            continue
+        d = diags.get(tid)
+        pred_hack = 1 if (d is not None and d.failure_category == "Reward Hack") else 0
+        y_true.append(1 if gold == REWARD_HACK_TRUE else 0)
+        y_pred.append(pred_hack)
+    cm = confusion_matrix(y_true, y_pred)
+    return {"confusion": cm, **precision_recall_f1(cm), "n_evaluated": len(y_true)}
+
+
 def judge_agreement(diags: dict[str, Diagnosis], verdicts: dict[str, JudgeVerdict]) -> dict:
     ids = sorted(set(diags) & set(verdicts))
     heur = [diags[i].diagnosis for i in ids]

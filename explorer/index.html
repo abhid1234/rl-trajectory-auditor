@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>RL Trajectory Auditor — Inspector</title>
+<meta name="description" content="Step through real RL agent trajectories and see where a heuristic and an LLM judge disagree on why a run failed." />
+<link rel="preload" href="fonts/jetbrains-mono-400.woff2" as="font" type="font/woff2" crossorigin />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div class="app">
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="k">RL Trajectory Auditor</span>
+      <h1>The <em>Inspector</em></h1>
+    </div>
+    <div class="metric">
+      <span class="lab">Heuristic precision</span>
+      <span class="v" id="m-h">—</span>
+    </div>
+    <div class="metric judge">
+      <span class="lab">Judge precision</span>
+      <span class="v" id="m-j">—</span>
+    </div>
+    <div class="metric">
+      <span class="lab">Judge overturns</span>
+      <span class="v"><b id="m-c">—</b> <small>of heuristic false alarms</small></span>
+    </div>
+    <span class="grow"></span>
+    <button id="btn-import" class="topbtn import" title="inspect your own trajectory — runs entirely in your browser">⬆ Inspect yours</button>
+    <button id="btn-finding" class="topbtn" title="the finding (front page)">◆ Finding</button>
+    <button id="btn-challenge" class="topbtn" title="test yourself: guess the diagnosis">🎯 Challenge</button>
+    <button id="btn-share" class="topbtn" title="copy a link to this exact view">⤴ Share</button>
+    <button id="btn-keys" class="topbtn" title="keyboard shortcuts">⌨</button>
+    <button id="mode-toggle" class="modetoggle" title="toggle the full expert view">Expert view ›</button>
+    <div class="src">
+      <div>source <b>nebius/SWE-rebench-openhands</b></div>
+      <div>judge <b>Gemini 2.5 Flash</b> · audited <b id="m-n">—</b></div>
+    </div>
+  </header>
+
+  <div class="body">
+    <aside class="rail">
+      <div class="search"><input id="railsearch" type="search" placeholder="search task / repo…" autocomplete="off" /></div>
+      <div class="filters" id="railfilters"></div>
+      <div class="list" id="raillist"></div>
+      <div class="count" id="railcount">—</div>
+    </aside>
+
+    <main class="insp" id="insp">
+      <div class="empty">Select a trajectory to inspect.</div>
+    </main>
+  </div>
+
+</div>
+<div id="landing" class="landing" hidden></div>
+<div id="import-modal" class="overlay-sc" hidden></div>
+<div id="shortcuts" class="overlay-sc" hidden></div>
+<div id="toast" class="toast"></div>
+<div id="patch-modal" class="overlay-sc" hidden></div>
+<script src="app.js"></script>
+</body>
+</html>
