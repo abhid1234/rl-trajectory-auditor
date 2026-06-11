@@ -459,3 +459,4 @@ kbd { font-family:var(--mono); font-size:11px; padding:2px 7px; border:1px solid
 .t-x { margin-left:auto; font-family:var(--mono); font-size:13px; line-height:1; color:var(--ink-soft);
   padding:1px 6px; border-radius:3px; cursor:pointer; }
 .t-x:hover { background:var(--oxblood); color:#fff; }
+.srclink { color:var(--oxblood); text-decoration:none; border-bottom:1px solid rgba(123,45,38,0.3); }
