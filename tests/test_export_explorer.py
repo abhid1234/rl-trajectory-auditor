@@ -75,3 +75,18 @@ def test_build_full_explorer_writes_index_and_traces(tmp_path):
     off = [m for m in full["messages"] if m["offending"]]
     assert len(off) == 1 and off[0]["idx"] == 1
     assert os.path.exists(out + "/summary.json")
+
+
+def test_build_full_explorer_writes_map(tmp_path):
+    work = _stage(tmp_path)
+    out = str(tmp_path / "data")
+    build_full_explorer(_audit(), work, out, max_cards=50)
+    import json as _j
+    m = _j.load(open(out + "/map.json"))
+    assert m["count"] >= 1
+    pt = next(p for p in m["points"] if p["id"] == "a")
+    assert pt["turns"] == 3
+    assert pt["judge"] == "CLEAN"          # judge verdict for 'a' in the fixture
+    assert pt["heur"] == "TRAINING"
+    assert 0 <= pt["rep"] <= 1             # repetitiveness: top tool share
+    assert pt["cur"] is True               # 'a' is in the curated set

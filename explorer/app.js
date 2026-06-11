@@ -240,6 +240,7 @@ function renderInspector() {
       <button id="b-off" class="on" title="jump to offending step">⚑ offending</button>
       <div class="rolef">${ROLES.map((r) => `<button class="rf fchip" data-r="${r}">${r}</button>`).join("")}</div>
       <div class="tsearch"><input id="tsearch" type="search" placeholder="search in trace…" autocomplete="off" /></div>
+      <button id="b-ask" class="helpbtn" title="interrogate this trace with your own Gemini key">💬 ask</button>
       <button id="b-help" class="helpbtn" title="how to read this">? guide</button>
     </div>
 
@@ -545,9 +546,10 @@ function renderLanding() {
     <div class="land-dist"><div class="land-dist-h">What 5,000 trajectories actually fail at</div>${bars}</div>
     <p class="land-take">You can't trust surface signals — or aggregate eval metrics. You have to read the trajectories. This tool lets you.</p>
     <button id="land-go" class="land-go">Explore the trajectories →</button>
+    <a id="land-gauntlet" class="land-alt" href="#">…or test yourself: the 10-trace gauntlet 🎯</a>
     ${PRIMER_HTML}
     <button id="land-go2" class="land-go">Got it — let me explore →</button>
-    <div class="land-foot">source · nebius/SWE-rebench-openhands-trajectories &nbsp;·&nbsp; judge · Gemini 2.5 Flash &nbsp;·&nbsp; <a href="https://github.com/abhid1234/rl-trajectory-auditor" target="_blank" rel="noopener">code</a></div>
+    <div class="land-foot">source · nebius/SWE-rebench-openhands-trajectories &nbsp;·&nbsp; judge · Gemini 2.5 Flash &nbsp;·&nbsp; <a href="https://github.com/abhid1234/rl-trajectory-auditor" target="_blank" rel="noopener">code</a> &nbsp;·&nbsp; <a href="story.html">📖 read: The Pileup — 51 agents, one trap</a></div>
   </div>`;
   $("#land-go").onclick = hideLanding;
   $("#land-go2").onclick = hideLanding;
@@ -567,7 +569,9 @@ function forkLinksHtml(t) {
   if (!f) return "";
   const grp = (state.forkGroups[f] || []).filter((c) => c.trajectory_id !== t.trajectory_id);
   if (!grp.length) return "";
-  const chips = grp.slice(0, 10).map((c) => `<button class="forklink" data-id="${esc(c.trajectory_id)}">${esc(c.task_id)}</button>`).join("");
+  const chips = grp.slice(0, 10).map((c) =>
+    `<span class="forkpair"><button class="forklink" data-id="${esc(c.trajectory_id)}">${esc(c.task_id)}</button>` +
+    `<button class="fork-diff" data-id="${esc(c.trajectory_id)}" title="compare paths: where did these two agents diverge?">⇄</button></span>`).join("");
   return `<div class="forkbox"><div class="fork-h">🔁 ${grp.length} other agent${grp.length > 1 ? "s" : ""} got stuck on the very same move sequence</div>` +
     `<code class="fork-seq">${esc(f)}</code><div class="fork-links">${chips}</div></div>`;
 }
@@ -598,9 +602,11 @@ function toggleChallenge() {
 }
 function makeGuess(dx) {
   state.guessed = true;
-  state.score.n++; if (dx === state.traj.judge.diagnosis) state.score.hit++;
+  const correct = dx === state.traj.judge.diagnosis;
+  state.score.n++; if (correct) state.score.hit++;
   updateChallengeBtn(); renderInspector();
-  toast(dx === state.traj.judge.diagnosis ? "✓ You matched the judge!" : `✗ Judge said ${state.traj.judge.diagnosis}`);
+  toast(correct ? "✓ You matched the judge!" : `✗ Judge said ${state.traj.judge.diagnosis}`);
+  try { if (window._rlta && window._rlta.quizOnGuess) window._rlta.quizOnGuess(dx, correct); } catch (e) {}
 }
 
 /* ---- bring-your-own trajectory (runs 100% in the browser) -------------- */

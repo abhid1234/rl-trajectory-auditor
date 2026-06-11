@@ -96,6 +96,31 @@ HARNESS vs TRAINING SPLIT:
 Python 3.12+. Standard library only — nothing to `pip install` to run. `pytest`
 for the test suite (`python -m pytest`).
 
+## MCP server
+
+The auditor ships as an MCP stdio server (`src/mcp_server.py`, stdlib only).
+Register it with Claude Code from the repo directory:
+
+    claude mcp add rl-audit -- python3 -m src.mcp_server
+
+It exposes one tool, `audit_trajectory`, which takes a trajectory as a JSON
+string (`trajectory_json`) or a path to a `.json` file (`file_path`), runs all
+detectors plus the 4-point diagnostic, and returns the HARNESS / TRAINING /
+PRODUCT / BOTH / CLEAN verdict with evidence and a fix recommendation.
+
+## CI gate (GitHub Action)
+
+Fail CI when a trajectory batch shows too many harness failures or reward
+hacks — so you never retrain on dirty data.
+
+```yaml
+- uses: abhid1234/rl-trajectory-auditor@main
+  with:
+    path: trajectories/
+    max-harness-pct: "20"
+    max-reward-hack-pct: "30"
+```
+
 ## References
 
 - Auriel Wright — https://aurielws.github.io/posts/rl-pet-peeves-part-1/

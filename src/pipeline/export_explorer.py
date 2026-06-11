@@ -175,7 +175,21 @@ def _stream_staged_light(work_dir: str):
             except (ValueError, OSError):
                 continue
             tid = r.get("trajectory_id", r.get("task_id"))
-            light[tid] = {"test_results": r.get("test_results", {}), "resolved": r.get("resolved")}
+            msgs = r.get("messages") or r.get("trajectory") or []
+            tools = []
+            for m in msgs:
+                for tc in (m.get("tool_calls") or []):
+                    fn = (tc.get("function") or {}).get("name")
+                    if fn:
+                        tools.append(fn)
+            top = 0.0
+            if tools:
+                freq = {}
+                for t_ in tools:
+                    freq[t_] = freq.get(t_, 0) + 1
+                top = max(freq.values()) / len(tools)
+            light[tid] = {"test_results": r.get("test_results", {}), "resolved": r.get("resolved"),
+                          "turns": len(msgs), "rep": round(top, 3)}
             path_by_id[tid] = p
     return light, path_by_id
 
@@ -237,6 +251,20 @@ def build_full_explorer(audit_run: dict, work_dir: str, out_dir: str, max_cards:
     json.dump(summary, open(os.path.join(out_dir, "summary.json"), "w"), indent=2)
     json.dump({"n": summary["n"], "count": len(index), "cards": index},
               open(os.path.join(out_dir, "index.json"), "w"), indent=2)
+
+    # map.json: one point per JUDGED trajectory (behavioral features + verdicts)
+    curated = set(chosen)
+    points = []
+    for tid, v in verds.items():
+        lt = light.get(tid)
+        d = diags.get(tid)
+        if not lt or not d:
+            continue
+        points.append({"id": tid, "turns": lt.get("turns", 0), "rep": lt.get("rep", 0.0),
+                       "judge": v.get("diagnosis"), "heur": d.get("diagnosis"),
+                       "cur": tid in curated})
+    json.dump({"count": len(points), "points": points},
+              open(os.path.join(out_dir, "map.json"), "w"))
     return summary, index
 
 

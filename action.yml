@@ -1,0 +1,21 @@
+name: "RL Trajectory Audit Gate"
+description: "Fail CI when RL training trajectories show too many harness failures or reward hacks — don't retrain on dirty data."
+branding:
+  icon: "search"
+  color: "red"
+inputs:
+  path:
+    description: "Directory of trajectory .json/.jsonl files"
+    required: true
+  max-harness-pct:
+    description: "Fail if harness failures exceed this percent"
+    default: "20"
+  max-reward-hack-pct:
+    description: "Fail if reward-hack rate exceeds this percent"
+    default: "30"
+runs:
+  using: "composite"
+  steps:
+    - shell: bash
+      run: python3 -m src.ci_gate "${{ inputs.path }}" --max-harness-pct "${{ inputs['max-harness-pct'] }}" --max-reward-hack-pct "${{ inputs['max-reward-hack-pct'] }}"
+      working-directory: ${{ github.action_path }}

@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>The Pileup — 51 agents, one trap | RL Trajectory Auditor</title>
+<meta name="description" content="Fifty-one RL agents, seventeen different repos, the exact same failing three-move loop. A short story about why you have to read your trajectories." />
+<meta property="og:title" content="The Pileup — 51 agents, one trap" />
+<meta property="og:description" content="Fifty-one RL agents, seventeen repos, the exact same failing loop: edit, edit, edit. A short story from a 5,000-trajectory audit." />
+<meta property="og:image" content="https://abhid1234-rl-trajectory-auditor.static.hf.space/og.png" />
+<meta name="twitter:card" content="summary_large_image" />
+<link rel="stylesheet" href="styles.css" />
+<style>
+  body.story { overflow:auto; }
+  .st-wrap { max-width:680px; margin:0 auto; padding:60px 24px 120px; }
+  .st-k { font-family:var(--mono); font-size:11px; letter-spacing:0.28em; text-transform:uppercase; color:var(--oxblood); margin-bottom:16px; }
+  .st-h1 { font-family:var(--display); font-weight:600; font-size:clamp(36px,7vw,64px); line-height:1.0; letter-spacing:-0.02em; margin:0 0 10px; }
+  .st-h1 em { font-style:italic; color:var(--oxblood); }
+  .st-lede { font-family:var(--display); font-size:21px; line-height:1.4; color:var(--ink-soft); margin:18px 0 0; }
+  .st-sec { margin-top:64px; opacity:0; transform:translateY(24px); transition:opacity .7s, transform .7s; }
+  .st-sec.vis { opacity:1; transform:none; }
+  .st-p { font-size:17px; line-height:1.7; margin:0 0 18px; }
+  .st-p b { color:var(--oxblood); }
+  .st-big { font-family:var(--display); font-weight:600; font-size:clamp(40px,8vw,84px); color:var(--oxblood); line-height:1; margin:8px 0; }
+  .st-cap { font-family:var(--mono); font-size:11.5px; color:var(--ink-soft); letter-spacing:0.05em; }
+  .st-loop { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:22px 0; }
+  .st-move { font-family:var(--mono); font-size:13px; font-weight:700; padding:11px 16px; border:1.5px solid var(--oxblood);
+    color:var(--oxblood); border-radius:5px; background:rgba(123,45,38,0.05); animation:pulse 1.6s infinite; }
+  .st-move:nth-child(2){ animation-delay:.25s; } .st-move:nth-child(3){ animation-delay:.5s; }
+  .st-again { font-family:var(--display); font-style:italic; color:var(--ink-soft); font-size:15px; }
+  .st-quote { border-left:3px solid var(--oxblood); padding:6px 0 6px 20px; font-family:var(--display); font-style:italic;
+    font-size:22px; line-height:1.4; margin:28px 0; }
+  .st-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(13px,1fr)); gap:3px; margin:20px 0 8px; }
+  .st-dot { aspect-ratio:1; border-radius:2px; background:var(--oxblood); opacity:0.78; }
+  .st-dot.dim { background:var(--rule); opacity:1; }
+  .st-ex { border:1px solid var(--rule); border-radius:5px; background:var(--card); padding:14px 16px; margin:10px 0; display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
+  .st-ex .nm { font-family:var(--mono); font-size:12.5px; font-weight:700; }
+  .st-ex .meta { font-family:var(--mono); font-size:10.5px; color:var(--ink-soft); }
+  .st-ex a { font-family:var(--mono); font-size:11px; color:var(--oxblood); text-decoration:none; border:1px solid var(--oxblood); padding:6px 11px; border-radius:3px; white-space:nowrap; }
+  .st-ex a:hover { background:var(--oxblood); color:#fff; }
+  .st-cta { margin-top:54px; text-align:center; }
+  .st-cta a.go { display:inline-block; font-family:var(--mono); font-size:13.5px; font-weight:700; padding:13px 26px;
+    background:var(--oxblood); color:#fff; text-decoration:none; border-radius:4px; }
+  .st-foot { margin-top:60px; padding-top:18px; border-top:2px solid var(--ink); font-family:var(--mono); font-size:11px; color:var(--ink-soft); display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px; }
+  .st-foot a { color:var(--oxblood); text-decoration:none; }
+</style>
+</head>
+<body class="story">
+<div class="st-wrap">
+
+  <header>
+    <div class="st-k">A story from the audit · RL Trajectory Auditor</div>
+    <h1 class="st-h1">The <em>Pileup.</em></h1>
+    <p class="st-lede">Fifty-one agents. Seventeen different codebases. The exact same trap.</p>
+  </header>
+
+  <section class="st-sec">
+    <p class="st-p">We audited 5,000 real reinforcement-learning agent runs — coding agents trying to fix
+    real bugs in real repositories. Each run is a <i>trajectory</i>: every command, every edit, every
+    error message, sometimes two hundred turns long. Almost nobody reads these. We did.</p>
+    <p class="st-p">And in the middle of the corpus, a pattern kept surfacing. Not similar. <b>Identical.</b></p>
+  </section>
+
+  <section class="st-sec">
+    <div class="st-loop">
+      <span class="st-move">str_replace_editor</span>
+      <span class="st-move">str_replace_editor</span>
+      <span class="st-move">str_replace_editor</span>
+      <span class="st-again">…and again. And again.</span>
+    </div>
+    <p class="st-p">Edit the file. Edit the file. Edit the file. No running the tests in between. No
+    reading a different file. No stepping back. Just the same move, over and over — the behavioral
+    signature of an agent that has stopped <i>diagnosing</i> and started <i>thrashing</i>.</p>
+  </section>
+
+  <section class="st-sec">
+    <div class="st-big">51 agents</div>
+    <p class="st-cap">in our curated set alone walked this exact three-move loop — across <b>17 unrelated repositories</b>, from a serialization library to a welding-data toolkit.</p>
+    <div class="st-grid">
+      <span class="st-dot"></span><span class="st-dot"></span><span class="st-dot"></span><span class="st-dot"></span><span class="st-dot"></span><span class="st-dot"></span><span class="st-dot"></span><span class="st-dot"></span><span class="st-dot"></span><span class="st-dot"></span><span class="st-dot"></span><span class="st-dot"></span><span class="st-dot"></span><span class="st-dot"></span><span class="st-dot"></span><span class="st-dot"></span><span class="st-dot"></span><span class="st-dot"></span><span class="st-dot"></span><span class="st-dot"></span><span class="st-dot"></span><span class="st-dot"></span><span class="st-dot"></span><span class="st-dot"></span><span class="st-dot"></span><span class="st-dot"></span><span class="st-dot"></span><span class="st-dot"></span><span class="st-dot"></span><span class="st-dot"></span><span class="st-dot"></span><span class="st-dot"></span><span class="st-dot"></span><span class="st-dot"></span><span class="st-dot"></span><span class="st-dot"></span><span class="st-dot"></span><span class="st-dot"></span><span class="st-dot"></span><span class="st-dot"></span><span class="st-dot"></span><span class="st-dot"></span><span class="st-dot"></span><span class="st-dot"></span><span class="st-dot"></span><span class="st-dot"></span><span class="st-dot"></span><span class="st-dot"></span><span class="st-dot"></span><span class="st-dot"></span><span class="st-dot"></span>
+    </div>
+    <p class="st-cap">one square = one stuck agent · average run length 126 turns, the longest 201</p>
+  </section>
+
+  <section class="st-sec">
+    <p class="st-p">Zoom out to the full five thousand and it gets worse: <b>1,792 runs — 36% of the
+    corpus</b> — repeat a failing move-sequence that other agents in the same repo also got stuck on.
+    These aren't random mistakes. They're <i>shared ruts</i>: decision points where the training
+    distribution simply doesn't know what to do next, so every agent falls into the same hole.</p>
+    <div class="st-quote">An aggregate pass-rate will never show you a rut.<br/>A trajectory will.</div>
+    <p class="st-p">Here's the twist that makes auditing genuinely hard: the same three-edit loop doesn't
+    always mean the same disease. Read the actual traces and the LLM judge splits them — some are a
+    <b>training gap</b> (the agent thrashes when its plan fails), some are a <b>harness bug</b>
+    (the environment silently rejected every edit, so looping was almost rational), and some are
+    <b>product routing</b>. Same symptom, three different fixes. That's why you read.</p>
+  </section>
+
+  <section class="st-sec">
+    <p class="st-p">Don't take our word for it — here are three of the fifty-one, fully loaded.
+    Watch the loop happen:</p>
+    <div class="st-ex"><div><div class="nm">David-Wobrock__sqlvalidator-17</div><div class="meta">201 turns · judge says HARNESS</div></div><a href="index.html#chatcmpl-165daaeb5278ca5ba43eb9b0bf191214/1">step through →</a></div>
+    <div class="st-ex"><div><div class="nm">Fatal1ty__mashumaro-116</div><div class="meta">201 turns · judge says TRAINING</div></div><a href="index.html#chatcmpl-515e3a2f4869e7b1899ca05cf40f1743/1">step through →</a></div>
+    <div class="st-ex"><div><div class="nm">Fatal1ty__mashumaro-162</div><div class="meta">201 turns · judge says PRODUCT</div></div><a href="index.html#chatcmpl-d2d24d60f7adae2dd675605b5dd2af91/1">step through →</a></div>
+    <p class="st-cap">same loop, three different verdicts — use the ⇄ diff button inside to see where their paths split.</p>
+  </section>
+
+  <section class="st-sec st-cta">
+    <a class="go" href="index.html">Explore all 5,000 in the Inspector →</a>
+  </section>
+
+  <footer class="st-foot">
+    <span>data · nebius/SWE-rebench-openhands-trajectories</span>
+    <span><a href="https://github.com/abhid1234/rl-trajectory-auditor">code</a> · <a href="index.html">the Inspector</a></span>
+  </footer>
+
+</div>
+<script>
+  const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) e.target.classList.add("vis"); }),
+    { threshold: 0.15 });
+  document.querySelectorAll(".st-sec").forEach((s) => io.observe(s));
+</script>
+</body>
+</html>
