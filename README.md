@@ -6,10 +6,18 @@ Audit RL training trajectories and automatically classify each failure as a
 
 > Teams ship broken models because nobody reads their trajectories. This reads them.
 
+**🔬 Live demo — The Inspector:** https://abhid1234-rl-trajectory-auditor.static.hf.space
+— step through 200 fully-loaded real trajectories from a **5,000-trajectory audit**, watch the
+detectors fire live, or drop in your own trajectory JSON (it never leaves your browser).
+
+**📊 The finding:** heuristics over-flag reward-hacking (precision **0.43**); an LLM judge that
+reads the trace overturns **75%** of those false alarms. Full numbers, method, and caveats in
+[`docs/FINDINGS.md`](docs/FINDINGS.md).
+
 ## Quickstart
 
 ```bash
-git clone <repo> && cd rl_trajectory_auditor
+git clone https://github.com/abhid1234/rl-trajectory-auditor && cd rl-trajectory-auditor
 python demo/sample_run.py                 # run against bundled fixtures
 python -m src.auditor audit tests/fixtures --json out.json
 ```
