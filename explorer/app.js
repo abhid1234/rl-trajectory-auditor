@@ -462,6 +462,70 @@ function setMode(simple) {
   if (state.traj) { applyVisibility(); updateGuide(); }
 }
 
+/* ---- 90-second primer: trajectories, evals, the audit ------------------- */
+const PRIMER_HTML = `
+<div class="primer" id="primer">
+  <div class="prim-divider"><span>New to agent trajectories? A 90-second primer</span></div>
+
+  <section class="prim-sec">
+    <h2 class="prim-h"><span class="prim-n">1</span>What is a trajectory?</h2>
+    <p class="prim-p">An RL coding agent doesn't just answer — it <b>works</b>. It reads files, runs
+    commands, edits code, and watches what the environment says back, turn after turn. The full
+    transcript of that back-and-forth is a <b>trajectory</b> — the only place the agent's real
+    behavior is visible.</p>
+    <div class="diagram">
+      <div class="dg-row">
+        <span class="dg-chip c-user">TASK<small>"fix this bug"</small></span>
+        <span class="dg-arrow"></span>
+        <span class="dg-chip c-asst">AGENT<small>thinks · acts</small></span>
+        <span class="dg-arrow" data-lbl="tool call"></span>
+        <span class="dg-chip c-tool">ENVIRONMENT<small>shell · files · tests</small></span>
+      </div>
+      <div class="dg-return"><span class="dg-return-lbl">↩ observation — and the loop repeats, for tens to hundreds of turns, until the agent submits a <b>patch</b></span></div>
+      <div class="dg-strip">
+        <span class="dg-strip-lbl">one run, as turns:</span>
+        <span class="mmx m-user"></span><span class="mmx m-asst"></span><span class="mmx m-tool"></span><span class="mmx m-asst"></span><span class="mmx m-tool"></span><span class="mmx m-asst"></span><span class="mmx m-tool"></span><span class="mmx m-asst"></span><span class="mmx m-tool"></span><span class="mmx m-asst"></span><span class="mmx m-tool"></span><span class="mmx m-off"></span>
+      </div>
+      <p class="dg-tie">▸ In the Inspector, this strip is the <b>minimap</b> — every tick one turn, the red tick the step the judge flagged.</p>
+    </div>
+  </section>
+
+  <section class="prim-sec">
+    <h2 class="prim-h"><span class="prim-n">2</span>How does a run get scored? (evals)</h2>
+    <p class="prim-p">After the agent submits, its patch faces two very different exams. The agent
+    often writes — or can edit — <b>its own tests</b>, so passing them is gameable. The <b>gold
+    tests</b> are hidden, written by humans: the actual ground truth. The gap between the two exams
+    is where trouble hides.</p>
+    <div class="diagram">
+      <div class="dg-gates-row">
+        <span class="dg-chip c-patch">PATCH</span>
+        <span class="dg-arrow"></span>
+        <div class="dg-gates">
+          <div class="dg-gate ok"><span class="dg-gate-name">agent's own tests</span><span class="dg-gate-res">✓ PASS</span><span class="dg-gate-note">easy to game</span></div>
+          <div class="dg-gate bad"><span class="dg-gate-name">hidden gold tests</span><span class="dg-gate-res">✗ FAIL</span><span class="dg-gate-note">the truth</span></div>
+        </div>
+      </div>
+      <div class="dg-eq">✓ self-pass &nbsp;+&nbsp; ✗ gold-fail &nbsp;=&nbsp; <b>the reward-hack signature</b></div>
+      <p class="dg-tie">▸ On every trajectory card these are the <b>self-test / gold-test</b> badges.</p>
+    </div>
+  </section>
+
+  <section class="prim-sec">
+    <h2 class="prim-h"><span class="prim-n">3</span>Why audit trajectories at all?</h2>
+    <p class="prim-p">Because an aggregate pass-rate can't tell you <b>why</b> a run failed — and the
+    why decides the fix. A broken environment means <b>fix the harness</b> (retraining is wasted
+    compute). A gamed reward means <b>fix the rubric</b>. So the audit asks three questions of every
+    trace:</p>
+    <div class="diagram">
+      <div class="dg-q"><span class="dg-q-txt">Could anyone solve it with what the environment provided?</span><span class="dg-q-no">no →</span><span class="dg-verdict v-HARNESS">HARNESS<small>fix the env</small></span></div>
+      <div class="dg-q"><span class="dg-q-txt">Did it earn the score via a shortcut?</span><span class="dg-q-no">yes →</span><span class="dg-verdict v-TRAINING">TRAINING<small>fix the reward</small></span></div>
+      <div class="dg-q"><span class="dg-q-txt">Both exams green, nothing weird?</span><span class="dg-q-no">yes →</span><span class="dg-verdict v-CLEAN">CLEAN<small>ship it</small></span></div>
+      <p class="dg-tie">▸ That's the <b>verdict</b> on every card — and where our cheap heuristic and the LLM judge
+      disagree, the judge sides with ground truth 3 times out of 4. That disagreement is the whole finding.</p>
+    </div>
+  </section>
+</div>`;
+
 /* ---- front-door finding page ------------------------------------------- */
 function renderLanding() {
   const s = state.summary, rh = s.reward_hack || {};
@@ -472,7 +536,8 @@ function renderLanding() {
   $("#landing").innerHTML = `<div class="land-card">
     <div class="land-k">A forensic audit · ${(s.n || 0).toLocaleString()} real RL agent trajectories</div>
     <h1 class="land-h">I read ${(s.n || 0).toLocaleString()} RL agent trajectories<br>so you don't have to.</h1>
-    <p class="land-sub">Teams ship broken models because nobody reads their training traces. So a cheap heuristic and an LLM judge read all of them — and disagreed in a telling way.</p>
+    <p class="land-sub">Teams ship broken models because nobody reads their training traces. So a cheap heuristic and an LLM judge read all of them — and disagreed in a telling way.
+      <a class="prim-jump" href="#primer">New to trajectories? 90-second primer ↓</a></p>
     <div class="land-stats">
       <div class="ls"><div class="ls-v">${rh.judge_corrects_pct}%</div><div class="ls-l">of the heuristic's <b>${(rh.false_positives || 0).toLocaleString()}</b> reward-hack false alarms are overturned by the judge, toward ground truth.</div></div>
       <div class="ls"><div class="ls-v">${n2(rh.heuristic_precision)} <span class="arr">→</span> <b>${n2(rh.judge_precision)}</b></div><div class="ls-l">reward-hack precision — a regex heuristic vs. an LLM that actually reads the trace.</div></div>
@@ -480,9 +545,14 @@ function renderLanding() {
     <div class="land-dist"><div class="land-dist-h">What 5,000 trajectories actually fail at</div>${bars}</div>
     <p class="land-take">You can't trust surface signals — or aggregate eval metrics. You have to read the trajectories. This tool lets you.</p>
     <button id="land-go" class="land-go">Explore the trajectories →</button>
-    <div class="land-foot">source · nebius/SWE-rebench-openhands-trajectories &nbsp;·&nbsp; judge · Gemini 2.5 Flash</div>
+    ${PRIMER_HTML}
+    <button id="land-go2" class="land-go">Got it — let me explore →</button>
+    <div class="land-foot">source · nebius/SWE-rebench-openhands-trajectories &nbsp;·&nbsp; judge · Gemini 2.5 Flash &nbsp;·&nbsp; <a href="https://github.com/abhid1234/rl-trajectory-auditor" target="_blank" rel="noopener">code</a></div>
   </div>`;
   $("#land-go").onclick = hideLanding;
+  $("#land-go2").onclick = hideLanding;
+  const pj = $(".prim-jump");
+  if (pj) pj.onclick = (e) => { e.preventDefault(); const p = $("#primer"); if (p) p.scrollIntoView({ behavior: "smooth" }); };
 }
 function showLanding() { renderLanding(); $("#landing").hidden = false; document.body.classList.add("landing-on"); }
 function hideLanding() { $("#landing").hidden = true; document.body.classList.remove("landing-on"); try { sessionStorage.setItem("rlta_seen", "1"); } catch (e) {} }
