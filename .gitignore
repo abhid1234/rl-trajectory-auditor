@@ -8,5 +8,6 @@ __pycache__/
 .pytest_cache/
 run1k/
 run5k/
+run_inspector_dev/
 run_validate200/
 trajectories/
