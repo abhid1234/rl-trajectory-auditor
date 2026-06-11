@@ -107,29 +107,51 @@ function passes(c) {
   return c.heuristic_category === state.filter;
 }
 
+function _railItem(c) {
+  const b = document.createElement("button");
+  b.className = "tnav" + (c.local ? " local" : "") + (state.cur === c.trajectory_id ? " active" : "");
+  const judgeBits = c.local
+    ? `<span class="t-mark loc">⬆ YOURS</span><span class="t-x" title="remove (stays only in this tab anyway)">×</span>`
+    : `<span class="t-vs">vs</span>` +
+      `<span class="dot" style="background:var(--d-${esc(c.judge_diagnosis || "CLEAN")})" title="judge"></span>` +
+      `<span class="t-mark ${c.agree ? "agr" : "dis"}">${c.agree ? "agree" : "disagree"}</span>`;
+  b.innerHTML =
+    `<div class="t-task">${esc(c.task_id)}</div>` +
+    `<div class="t-repo">${esc(c.repo || "—")} · ${c.n_messages} msgs</div>` +
+    `<div class="t-tags">` +
+      `<span class="dot" style="background:var(--d-${esc(c.heuristic_diagnosis)})" title="heuristic"></span>` +
+      judgeBits +
+    `</div>`;
+  b.onclick = (e) => {
+    if (e.target.classList && e.target.classList.contains("t-x")) { removeLocal(c.trajectory_id); return; }
+    select(c.trajectory_id);
+  };
+  return b;
+}
+
+function _railSec(label) {
+  const d = document.createElement("div");
+  d.className = "railsec";
+  d.textContent = label;
+  return d;
+}
+
 function renderRail() {
-  state.view = state.index.filter(passes);
+  // your imports: pinned on top, only narrowed by the search box (never by filter chips)
+  const locals = state.index.filter((c) => c.local &&
+    (!state.q || (c.task_id + " " + c.repo).toLowerCase().includes(state.q)));
+  state.view = state.index.filter((c) => !c.local && passes(c));
   const list = $("#raillist");
   list.innerHTML = "";
-  state.view.forEach((c) => {
-    const b = document.createElement("button");
-    b.className = "tnav" + (state.cur === c.trajectory_id ? " active" : "");
-    const judgeBits = c.local
-      ? `<span class="t-mark loc">LOCAL</span>`
-      : `<span class="t-vs">vs</span>` +
-        `<span class="dot" style="background:var(--d-${esc(c.judge_diagnosis || "CLEAN")})" title="judge"></span>` +
-        `<span class="t-mark ${c.agree ? "agr" : "dis"}">${c.agree ? "agree" : "disagree"}</span>`;
-    b.innerHTML =
-      `<div class="t-task">${esc(c.task_id)}</div>` +
-      `<div class="t-repo">${esc(c.repo || "—")} · ${c.n_messages} msgs</div>` +
-      `<div class="t-tags">` +
-        `<span class="dot" style="background:var(--d-${esc(c.heuristic_diagnosis)})" title="heuristic"></span>` +
-        judgeBits +
-      `</div>`;
-    b.onclick = () => select(c.trajectory_id);
-    list.appendChild(b);
-  });
-  $("#railcount").textContent = `${state.view.length} of ${state.index.length} trajectories`;
+  if (locals.length) {
+    list.appendChild(_railSec(`⬆ your trajectories (${locals.length}) — this tab only`));
+    locals.forEach((c) => list.appendChild(_railItem(c)));
+    list.appendChild(_railSec("audited corpus"));
+  }
+  state.view.forEach((c) => list.appendChild(_railItem(c)));
+  const nCorpus = state.index.filter((c) => !c.local).length;
+  $("#railcount").textContent =
+    (locals.length ? `${locals.length} yours · ` : "") + `${state.view.length} of ${nCorpus} corpus`;
 }
 
 /* ---- load + render one trajectory ------------------------------------- */
@@ -582,6 +604,11 @@ function addLocalTrajectory(raw, i) {
   const t = normalizeLocal(raw, i);
   t.heuristic = diagnoseLocal(t);
   t.agree = false;
+  // dedupe: re-importing the same trajectory replaces it instead of stacking copies
+  const dup = state.index.filter((c) => c.local && c.task_id === t.task_id
+                                        && c.n_messages === t.messages.length);
+  dup.forEach((c) => { delete state.localMap[c.trajectory_id]; });
+  state.index = state.index.filter((c) => !dup.includes(c));
   state.localMap[t.trajectory_id] = t;
   state.index.unshift({
     trajectory_id: t.trajectory_id, task_id: t.task_id, repo: t.repo,
@@ -590,6 +617,18 @@ function addLocalTrajectory(raw, i) {
     n_messages: t.messages.length, offending_index: null, fork: null, local: true,
   });
   return t;
+}
+
+function removeLocal(id) {
+  delete state.localMap[id];
+  state.index = state.index.filter((c) => c.trajectory_id !== id);
+  renderRail();
+  if (state.cur === id) {
+    const next = state.index.find((c) => c.local) || state.view[0] || state.index[0];
+    if (next) select(next.trajectory_id);
+    else $("#insp").innerHTML = `<div class="empty">Select a trajectory to inspect.</div>`;
+  }
+  toast("removed from this tab");
 }
 
 function importText(text) {

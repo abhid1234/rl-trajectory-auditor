@@ -447,3 +447,15 @@ kbd { font-family:var(--mono); font-size:11px; padding:2px 7px; border:1px solid
 .im-foot { display:flex; align-items:center; gap:12px; margin-top:13px; }
 .im-err { font-family:var(--mono); font-size:11px; color:var(--oxblood); flex:1; }
 .im-go { padding:10px 20px !important; font-size:12.5px !important; box-shadow:none !important; }
+
+/* ---- rail sections: your imports vs audited corpus --------------------- */
+.railsec { font-family:var(--mono); font-size:9px; letter-spacing:0.18em; text-transform:uppercase;
+  color:var(--ink-soft); padding:9px 12px 6px; background:var(--paper-2);
+  border-bottom:1px solid var(--rule); position:sticky; top:0; z-index:2; }
+.tnav.local { background:rgba(123,45,38,0.05); border-left:3px solid var(--oxblood); padding-left:9px; }
+.tnav.local:hover { background:rgba(123,45,38,0.1); }
+.tnav.local.active { background:var(--card); box-shadow:inset 3px 0 0 var(--oxblood); }
+.t-mark.loc { background:var(--oxblood); color:#fff; letter-spacing:0.08em; font-weight:700; }
+.t-x { margin-left:auto; font-family:var(--mono); font-size:13px; line-height:1; color:var(--ink-soft);
+  padding:1px 6px; border-radius:3px; cursor:pointer; }
+.t-x:hover { background:var(--oxblood); color:#fff; }
