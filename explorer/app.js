@@ -31,6 +31,7 @@ const state = {
   cursor: 0, playing: false, timer: null, hidden: new Set(), tq: "",
   simple: true, beats: [], beatI: 0,
   forkGroups: {}, challenge: false, guessed: false, score: { n: 0, hit: 0 },
+  localMap: {},
 };
 
 /* ----------------------------------------------------------------------- */
@@ -50,6 +51,7 @@ async function boot() {
     state.simple = initSimple; document.body.classList.toggle("simple", initSimple);
     const mt = $("#mode-toggle");
     if (mt) { mt.textContent = initSimple ? "Expert view ›" : "‹ Simple view"; mt.onclick = () => setMode(!state.simple); }
+    const I = $("#btn-import"); if (I) I.onclick = showImport;
     const F = $("#btn-finding"); if (F) F.onclick = showLanding;
     const S = $("#btn-share"); if (S) S.onclick = share;
     const K = $("#btn-keys"); if (K) K.onclick = showShortcuts;
@@ -112,14 +114,17 @@ function renderRail() {
   state.view.forEach((c) => {
     const b = document.createElement("button");
     b.className = "tnav" + (state.cur === c.trajectory_id ? " active" : "");
+    const judgeBits = c.local
+      ? `<span class="t-mark loc">LOCAL</span>`
+      : `<span class="t-vs">vs</span>` +
+        `<span class="dot" style="background:var(--d-${esc(c.judge_diagnosis || "CLEAN")})" title="judge"></span>` +
+        `<span class="t-mark ${c.agree ? "agr" : "dis"}">${c.agree ? "agree" : "disagree"}</span>`;
     b.innerHTML =
       `<div class="t-task">${esc(c.task_id)}</div>` +
       `<div class="t-repo">${esc(c.repo || "—")} · ${c.n_messages} msgs</div>` +
       `<div class="t-tags">` +
         `<span class="dot" style="background:var(--d-${esc(c.heuristic_diagnosis)})" title="heuristic"></span>` +
-        `<span class="t-vs">vs</span>` +
-        `<span class="dot" style="background:var(--d-${esc(c.judge_diagnosis || "CLEAN")})" title="judge"></span>` +
-        `<span class="t-mark ${c.agree ? "agr" : "dis"}">${c.agree ? "agree" : "disagree"}</span>` +
+        judgeBits +
       `</div>`;
     b.onclick = () => select(c.trajectory_id);
     list.appendChild(b);
@@ -134,7 +139,9 @@ async function select(id, step) {
   renderRail();
   const safe = id.replace(/[^a-zA-Z0-9_-]/g, "_");
   $("#insp").innerHTML = `<div class="empty">loading trace…</div>`;
-  try {
+  if (state.localMap[id]) {
+    state.traj = state.localMap[id];          // user-imported: lives only in this tab
+  } else try {
     state.traj = await fetch(`data/traj/${safe}.json`).then((r) => r.json());
   } catch (e) {
     $("#insp").innerHTML = `<div class="empty">Could not load this trace.</div>`;
@@ -159,11 +166,14 @@ function renderInspector() {
   const ts = t.test_split || {};
   const teach = TEACH[t.heuristic.category] || TEACH._default;
   const insp = $("#insp");
-  const hideVerdict = state.challenge && !state.guessed;
-  const judgeChip = hideVerdict
-    ? `<div class="chipv guess-chip"><span class="who">LLM judge</span><span class="dg">?</span><span class="ct">you guess first ↓</span></div>`
-    : chip("LLM judge", t.judge.diagnosis, t.judge.category, t.judge.confidence);
-  const vmarkHtml = hideVerdict
+  const notJudged = !t.judge || !t.judge.diagnosis;     // user-imported traces have no LLM pass
+  const hideVerdict = state.challenge && !state.guessed && !notJudged;
+  const judgeChip = notJudged
+    ? `<div class="chipv guess-chip"><span class="who">LLM judge</span><span class="dg">—</span><span class="ct">not judged · heuristics only (CLI runs the judge)</span></div>`
+    : hideVerdict
+      ? `<div class="chipv guess-chip"><span class="who">LLM judge</span><span class="dg">?</span><span class="ct">you guess first ↓</span></div>`
+      : chip("LLM judge", t.judge.diagnosis, t.judge.category, t.judge.confidence);
+  const vmarkHtml = (notJudged || hideVerdict)
     ? `<span class="vmark q">vs</span>`
     : `<span class="vmark ${t.agree ? "agr" : "dis"}">${t.agree ? "✓ agree" : "✗ disagree"}</span>`;
   insp.innerHTML = `
@@ -240,7 +250,8 @@ function renderExtras() {
 }
 function renderGuessbar() {
   const host = $("#guessbar"); if (!host) return;
-  if (!(state.challenge && !state.guessed)) { host.innerHTML = ""; return; }
+  const noJudge = !state.traj.judge || !state.traj.judge.diagnosis;
+  if (noJudge || !(state.challenge && !state.guessed)) { host.innerHTML = ""; return; }
   const opts = ["HARNESS", "TRAINING", "PRODUCT", "CLEAN", "BOTH"];
   host.innerHTML = `<span class="gb-q">Your call — why did this run fail?</span>` +
     opts.map((o) => `<button class="gb d-${o}" data-d="${o}">${o}</button>`).join("");
@@ -314,9 +325,11 @@ function renderInspectPanel() {
     `</div>` +
     `<div class="vfinal">` +
       `<div class="vrow d-${esc(t.heuristic.diagnosis)}"><span class="who">Heuristic</span><span class="dg">${esc(t.heuristic.diagnosis)}</span><span class="ct">${esc(t.heuristic.category)}</span></div>` +
-      `<div class="vconj">${t.agree ? "and the judge agreed" : "but the judge, reading the whole trace, said"}</div>` +
-      `<div class="vrow d-${esc(t.judge.diagnosis || "CLEAN")} ${"" /*reveal*/}"><span class="who">LLM judge</span><span class="dg">${esc(t.judge.diagnosis || "—")}</span><span class="ct">${esc(t.judge.category || "")}</span></div>` +
-      `<p class="vreason">${esc(t.judge.reasoning || "—")}</p>` +
+      (t.judge && t.judge.diagnosis
+        ? `<div class="vconj">${t.agree ? "and the judge agreed" : "but the judge, reading the whole trace, said"}</div>` +
+          `<div class="vrow d-${esc(t.judge.diagnosis)}"><span class="who">LLM judge</span><span class="dg">${esc(t.judge.diagnosis)}</span><span class="ct">${esc(t.judge.category || "")}</span></div>` +
+          `<p class="vreason">${esc(t.judge.reasoning || "—")}</p>`
+        : `<div class="vconj">heuristics only — run the CLI's judge cascade for the LLM second opinion</div>`) +
     `</div>`;
   wireTips();
 }
@@ -496,6 +509,131 @@ function makeGuess(dx) {
   state.score.n++; if (dx === state.traj.judge.diagnosis) state.score.hit++;
   updateChallengeBtn(); renderInspector();
   toast(dx === state.traj.judge.diagnosis ? "✓ You matched the judge!" : `✗ Judge said ${state.traj.judge.diagnosis}`);
+}
+
+/* ---- bring-your-own trajectory (runs 100% in the browser) -------------- */
+const MAX_LOCAL = 20, MAX_MSG_CHARS = 6000;
+
+function normalizeLocal(raw, i) {
+  // Accept: our normalized/spec flat format ({messages,...}) or an HF-style row
+  // ({trajectory, instance_id, model_patch,...}, possibly wrapped in {row:...}).
+  const r = raw && raw.row ? raw.row : raw;
+  if (!r || typeof r !== "object") throw new Error("not a JSON object");
+  const rawMsgs = Array.isArray(r.messages) ? r.messages
+                : Array.isArray(r.trajectory) ? r.trajectory : null;
+  if (!rawMsgs) throw new Error("no `messages` (or `trajectory`) array found");
+  const tr = r.test_results || {};
+  const resolved = !!(r.resolved === true || r.resolved === 1);
+  const gen = Number(tr.pred_passes_gen_tests != null ? tr.pred_passes_gen_tests
+              : r.pred_passes_gen_tests != null ? r.pred_passes_gen_tests : NaN);
+  const gold = Number(tr.pred_passes_gold_tests != null ? tr.pred_passes_gold_tests : (resolved ? 1 : NaN));
+  const messages = rawMsgs.slice(0, 2000).map((m, idx) => ({
+    idx, role: m.role || "?",
+    content: String(m.content == null ? "" : m.content).slice(0, MAX_MSG_CHARS),
+    tools: (m.tool_calls || []).map((tc) => {
+      const fn = (tc && tc.function) || {};
+      return fn.name ? { name: fn.name, args: String(fn.arguments || "").slice(0, 2000) } : null;
+    }).filter(Boolean),
+    offending: false,
+  }));
+  const id = "local-" + (r.trajectory_id || r.task_id || r.instance_id || "traj") + "-" + i;
+  return {
+    trajectory_id: id,
+    task_id: String(r.task_id || r.instance_id || r.trajectory_id || "your-trajectory-" + (i + 1)),
+    repo: String(r.repo || ""), model: String(r.model || "—"),
+    patch: String(r.patch || r.model_patch || "").slice(0, 8000),
+    test_split: { gen: isNaN(gen) ? null : gen, gold: isNaN(gold) ? null : gold },
+    resolved, messages,
+    judge: { diagnosis: null, category: null, confidence: null, reasoning: "", offending_index: null },
+    local: true,
+  };
+}
+
+function diagnoseLocal(t) {
+  // Client-side mirror of the 4-point heuristic tree (corpus detectors n/a on a single trace).
+  const ev = [];
+  let ctxHits = 0;
+  t.messages.forEach((m) => {
+    if ((m.role === "tool" || m.role === "user") && CTX_RE.some((re) => re.test(m.content))) {
+      ctxHits++; if (ctxHits <= 3) ev.push("missing-context marker: " + firstLine(m.content));
+    }
+  });
+  const harness = ctxHits > 0 && !t.resolved;
+  const split = t.test_split.gen >= 1 && t.test_split.gold != null && t.test_split.gold < 1;
+  if (split) ev.push(`pred_passes_gen_tests=${t.test_split.gen} but gold=${t.test_split.gold}`);
+  const p = t.patch || "";
+  const editsTests = /^\+\+\+ b\/.*(tests?\/|test_|_test\.py)/m.test(p);
+  const hardcodes = /^\+\s*return\s+(["']?-?\d+["']?|["'].*["'])\s*(#.*)?$/m.test(p);
+  if (editsTests) ev.push("patch modifies a test file rather than source code");
+  if (hardcodes) ev.push("patch hardcodes a literal return value");
+  const training = split || editsTests || hardcodes;
+  let diagnosis, category, confidence;
+  if (t.resolved && !harness && !training) { diagnosis = "CLEAN"; category = "Clean"; confidence = 0.9; }
+  else if (harness && training) { diagnosis = "BOTH"; category = "Reward Hack"; confidence = 0.7; }
+  else if (harness) { diagnosis = "HARNESS"; category = "Context Gap"; confidence = Math.min(0.5 + 0.15 * ctxHits, 0.95); }
+  else if (training) { diagnosis = "TRAINING"; category = "Reward Hack"; confidence = split ? 0.95 : 0.8; }
+  else { diagnosis = "PRODUCT"; category = "Unclassified Failure"; confidence = 0.3; }
+  return { diagnosis, category, confidence, evidence: ev,
+           signals: { test_split_detected: split, fork_pattern: null,
+                      context_complete: !harness, tool_volume: "n/a" } };
+}
+
+function addLocalTrajectory(raw, i) {
+  const t = normalizeLocal(raw, i);
+  t.heuristic = diagnoseLocal(t);
+  t.agree = false;
+  state.localMap[t.trajectory_id] = t;
+  state.index.unshift({
+    trajectory_id: t.trajectory_id, task_id: t.task_id, repo: t.repo,
+    heuristic_diagnosis: t.heuristic.diagnosis, heuristic_category: t.heuristic.category,
+    judge_diagnosis: null, judge_category: null, agree: false,
+    n_messages: t.messages.length, offending_index: null, fork: null, local: true,
+  });
+  return t;
+}
+
+function importText(text) {
+  let parsed;
+  const trimmed = String(text || "").trim();
+  if (!trimmed) throw new Error("nothing to import");
+  try { parsed = JSON.parse(trimmed); }
+  catch (e) { // try JSONL
+    parsed = trimmed.split("\n").map((l) => l.trim()).filter(Boolean).map((l) => JSON.parse(l));
+  }
+  const list = Array.isArray(parsed) ? parsed : [parsed];
+  const added = [];
+  list.slice(0, MAX_LOCAL).forEach((r, i) => { added.push(addLocalTrajectory(r, Object.keys(state.localMap).length)); });
+  return added;
+}
+
+function showImport() {
+  $("#import-modal").innerHTML = `<div class="sc-card im">
+    <div class="sc-hd"><h2>Inspect your own trajectory</h2><button class="sc-x" data-close>×</button></div>
+    <div class="im-bd">
+      <p class="im-p">Drop a trajectory JSON below (or paste it). It runs <b>entirely in your browser</b> —
+      nothing is uploaded anywhere. You get the heuristic audit, plain-English narration and step-through;
+      the LLM-judge second opinion needs the <a href="https://huggingface.co/spaces/abhid1234/rl-trajectory-auditor/tree/main" target="_blank" rel="noopener">CLI</a>.</p>
+      <div class="im-drop" id="im-drop">drag &amp; drop a <code>.json</code> / <code>.jsonl</code> file here<br/><span class="dim">or</span><br/>
+        <label class="im-file">choose a file<input type="file" id="im-file" accept=".json,.jsonl,application/json" hidden /></label></div>
+      <textarea id="im-text" class="im-text" placeholder='or paste JSON — either OpenAI-style {"task_id": ..., "messages": [...], "patch": ..., "test_results": {...}} or an HF SWE-rebench row {"trajectory": [...], "instance_id": ...}'></textarea>
+      <div class="im-foot"><span class="im-err" id="im-err"></span><button id="im-go" class="land-go im-go">Inspect it →</button></div>
+    </div></div>`;
+  openOverlay("#import-modal");
+  const doImport = (text) => {
+    try {
+      const added = importText(text);
+      $("#import-modal").hidden = true;
+      renderRail();
+      if (added.length) select(added[0].trajectory_id);
+      toast(`✓ ${added.length} trajector${added.length > 1 ? "ies" : "y"} inspected locally — never left your browser`);
+    } catch (e) { $("#im-err").textContent = "Couldn't read that: " + e.message; }
+  };
+  $("#im-go").onclick = () => doImport($("#im-text").value);
+  $("#im-file").onchange = (e) => { const f = e.target.files[0]; if (f) f.text().then(doImport); };
+  const dz = $("#im-drop");
+  dz.ondragover = (e) => { e.preventDefault(); dz.classList.add("over"); };
+  dz.ondragleave = () => dz.classList.remove("over");
+  dz.ondrop = (e) => { e.preventDefault(); dz.classList.remove("over"); const f = e.dataTransfer.files[0]; if (f) f.text().then(doImport); };
 }
 
 /* ---- deep-links · share · shortcuts ------------------------------------ */
@@ -716,3 +854,6 @@ boot();
 try {
   if (!location.search.includes("notour") && !localStorage.getItem("rlta_tour")) setTimeout(openTour, 600);
 } catch (e) {}
+
+// exposed for headless testing
+try { window._rlta = { importText, normalizeLocal, diagnoseLocal }; } catch (e) {}

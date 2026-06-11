@@ -425,3 +425,25 @@ kbd { font-family:var(--mono); font-size:11px; padding:2px 7px; border:1px solid
   font-family:var(--mono); font-size:12px; background:var(--ink); color:var(--paper); padding:10px 16px; border-radius:6px;
   box-shadow:0 12px 30px -10px rgba(0,0,0,0.5); opacity:0; transition:opacity .2s, transform .2s; pointer-events:none; }
 .toast.on { opacity:1; transform:translateX(-50%) translateY(0); }
+
+/* ---- bring-your-own trajectory ----------------------------------------- */
+.topbtn.import { border-color:var(--oxblood); color:var(--oxblood); font-weight:700; }
+.topbtn.import:hover { background:var(--oxblood); color:#fff; }
+.t-mark.loc { background:rgba(68,82,92,0.15); color:#44525c; letter-spacing:0.08em; }
+.im { max-width:600px; }
+.im-bd { padding:16px 20px 20px; }
+.im-p { font-size:13.5px; line-height:1.55; color:var(--ink-soft); margin:0 0 14px; }
+.im-p b { color:var(--ink); } .im-p a { color:var(--oxblood); }
+.im-drop { border:2px dashed var(--rule); border-radius:6px; padding:22px; text-align:center;
+  font-family:var(--mono); font-size:12px; color:var(--ink-soft); background:var(--paper-2); transition:all .15s; }
+.im-drop.over { border-color:var(--oxblood); background:rgba(123,45,38,0.06); color:var(--oxblood); }
+.im-drop .dim { font-size:10px; }
+.im-file { display:inline-block; margin-top:6px; padding:6px 13px; border:1px solid var(--ink);
+  border-radius:3px; background:var(--card); color:var(--ink); cursor:pointer; font-family:var(--mono); font-size:11px; }
+.im-file:hover { background:var(--ink); color:var(--paper); }
+.im-text { width:100%; min-height:110px; margin-top:12px; padding:10px 12px; border:1px solid var(--rule);
+  border-radius:4px; background:var(--con-bg); color:var(--con-fg); font-family:var(--mono); font-size:11px; resize:vertical; }
+.im-text:focus { outline:1.5px solid var(--oxblood); }
+.im-foot { display:flex; align-items:center; gap:12px; margin-top:13px; }
+.im-err { font-family:var(--mono); font-size:11px; color:var(--oxblood); flex:1; }
+.im-go { padding:10px 20px !important; font-size:12.5px !important; box-shadow:none !important; }
