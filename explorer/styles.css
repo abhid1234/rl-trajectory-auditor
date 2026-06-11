@@ -312,3 +312,30 @@ mark { background:var(--hl); color:#1b1714; border-radius:1px; padding:0 1px; }
 .inspect .hint { font-size:11.5px; line-height:1.45; color:var(--ink-soft); background:rgba(123,45,38,0.06);
   border-left:3px solid var(--oxblood); border-radius:0 3px 3px 0; padding:7px 10px; margin-bottom:11px; }
 .inspect .hint b { color:var(--oxblood); }
+
+/* ---- mode toggle + Simple-mode narration guide ------------------------- */
+.modetoggle { font-family:var(--mono); font-size:11px; padding:6px 12px; border:1px solid var(--ink);
+  background:var(--ink); color:var(--paper); border-radius:3px; white-space:nowrap; }
+.modetoggle:hover { background:var(--oxblood); border-color:var(--oxblood); }
+
+.guide { display:none; }
+body.simple .guide { display:block; padding:16px 22px 18px; border-bottom:1px solid var(--rule);
+  background:linear-gradient(180deg,var(--card),var(--paper)); }
+.narr-step { font-family:var(--mono); font-size:10px; letter-spacing:0.14em; text-transform:uppercase; color:var(--ink-soft); margin-bottom:7px; }
+.narr-main { font-family:var(--display); font-weight:600; font-size:22px; line-height:1.32; margin:0; letter-spacing:-0.01em; max-width:60ch; }
+.narr-aud { font-family:var(--sans); font-size:14.5px; line-height:1.5; margin:11px 0 0; padding:9px 13px; max-width:62ch;
+  background:rgba(123,45,38,0.07); border-left:3px solid var(--oxblood); border-radius:0 4px 4px 0; color:var(--ink); }
+.narr-aud::before { content:'🔍  '; }
+.guide-nav { display:flex; align-items:center; gap:9px; margin-top:15px; flex-wrap:wrap; }
+.guide-nav button { font-family:var(--mono); font-size:12.5px; padding:8px 15px; border:1px solid var(--ink);
+  background:var(--card); color:var(--ink); border-radius:4px; }
+.guide-nav button:hover { background:var(--ink); color:var(--paper); }
+.guide-nav button.run { background:var(--oxblood); color:#fff; border-color:var(--oxblood); margin-left:4px; font-weight:700; }
+.guide-nav button.run:hover { background:var(--oxblood-2); }
+.beat { font-family:var(--mono); font-size:11px; color:var(--ink-soft); min-width:96px; text-align:center; }
+
+/* Simple mode hides the dense expert chrome */
+body.simple .ctrl, body.simple .minimap, body.simple .inspect { display:none; }
+body.simple .work { grid-template-columns:1fr; }
+body.simple .console { font-size:13px; }
+body.simple .teach { display:none; }   /* the narration replaces the static teaching strip */

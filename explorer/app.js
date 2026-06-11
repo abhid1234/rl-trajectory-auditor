@@ -29,6 +29,7 @@ const state = {
   summary: null, index: [], view: [], cur: null, traj: null,
   filter: "disagree", q: "",
   cursor: 0, playing: false, timer: null, hidden: new Set(), tq: "",
+  simple: true, beats: [], beatI: 0,
 };
 
 /* ----------------------------------------------------------------------- */
@@ -43,6 +44,10 @@ async function boot() {
     renderTop();
     buildRailFilters();
     applyRailFilter(state.filter);
+    let initSimple = true; try { initSimple = localStorage.getItem("rlta_mode") !== "expert"; } catch (e) {}
+    state.simple = initSimple; document.body.classList.toggle("simple", initSimple);
+    const mt = $("#mode-toggle");
+    if (mt) { mt.textContent = initSimple ? "Expert view ›" : "‹ Simple view"; mt.onclick = () => setMode(!state.simple); }
     if (state.view.length) select(state.view[0].trajectory_id);
   } catch (e) {
     $("#insp").innerHTML = `<div class="empty">No audit data found. Run the export, then reload.</div>`;
@@ -156,6 +161,20 @@ function renderInspector() {
       <div class="teach"><span class="icn">✦</span><span class="tx">${teach}</span><button class="x" title="dismiss" onclick="this.parentElement.remove()">×</button></div>
     </div>
 
+    <div class="guide" id="guide">
+      <div class="narr">
+        <div class="narr-step" id="narr-step"></div>
+        <p class="narr-main" id="narr-main">Press <b>Next ›</b> to walk through what happened, in plain English.</p>
+        <p class="narr-aud" id="narr-aud"></p>
+      </div>
+      <div class="guide-nav">
+        <button id="g-back" title="previous moment">‹ Back</button>
+        <span class="beat" id="beat"></span>
+        <button id="g-next" title="next moment">Next ›</button>
+        <button id="g-walk" class="run" title="auto-play the key moments">▶ Walk me through it</button>
+      </div>
+    </div>
+
     <div class="ctrl">
       <div class="seg">
         <button id="b-step-b" title="step back (←)">‹ step</button>
@@ -177,6 +196,11 @@ function renderInspector() {
 
   wireControls();
   computeEvents();
+  state.beats = keyMoments();
+  const off0 = state.traj.judge.offending_index;
+  state.cursor = state.simple ? (state.beats[0] != null ? state.beats[0] : 0)
+                              : (Number.isInteger(off0) ? off0 : state.traj.messages.length - 1);
+  state.beatI = nearestBeat(state.cursor);
   renderInspectPanel();
   renderMinimap();
   renderConsole();
@@ -284,6 +308,85 @@ function updateInspection() {
   setStep("#vs-fork", firedNow.has("fork_pattern"), "YES → repeated fork · TRAINING");
 }
 
+/* ---- plain-language narration + key moments (Simple mode) --------------- */
+const VERB = {
+  execute_bash: "ran a shell command", run_ipython: "ran some code", str_replace_editor: "edited a file",
+  edit_file: "edited a file", think: "thought out loud", finish: "submitted its solution",
+  submit: "submitted its solution", read_file: "opened a file", view: "looked at a file", browser: "used the browser",
+};
+const PLAIN = {
+  context_check: "the environment was missing something the agent needed — a harness problem, not the agent's fault",
+  reward_hack: "the agent may have taken a shortcut to look successful",
+  test_split: "it passed its own tests but failed the real ones",
+  tool_volume: "it used an unusual amount of activity for this task",
+  fork_pattern: "it got stuck repeating the same failing move",
+};
+function verb(name) { return VERB[name] || ("used the " + String(name || "?").replace(/_/g, " ") + " tool"); }
+function shortArg(tc) {
+  let a = (tc && tc.args) || "";
+  try { const o = JSON.parse(a); a = o.command || o.path || o.file_text || o.thought || Object.values(o)[0] || ""; } catch (e) {}
+  a = String(a).replace(/\s+/g, " ").trim().slice(0, 72);
+  return a ? "“" + a + "”" : "";
+}
+function narrate(idx) {
+  const t = state.traj, m = t.messages[idx]; let line = "", aud = "";
+  if (!m) return { line: "", aud: "" };
+  if (m.role === "system") line = "These are the agent's instructions — its job and the rules it has to follow.";
+  else if (m.role === "user") line = "The task: this is the bug the agent was asked to fix.";
+  else if (m.role === "assistant") {
+    if (m.tools && m.tools.length) { line = "The agent " + verb(m.tools[0].name) + "."; const sa = shortArg(m.tools[0]); if (sa) line += " " + sa; }
+    else line = "The agent is reasoning about what to do next.";
+  } else if (m.role === "tool") {
+    const c = m.content || "";
+    const bad = CTX_RE.some((re) => re.test(c)) || /\b(error|traceback|failed|exception)\b/i.test(c);
+    line = bad ? "The environment answered with a problem." : "The environment answered.";
+  }
+  const evs = state.events.filter((e) => e.at === idx);
+  if (evs.length) aud = "The auditor noticed: " + evs.map((e) => PLAIN[e.det.key] || e.det.name).join("; ") + ".";
+  if (t.judge.offending_index === idx) aud = (aud ? aud + " " : "") + "This is the step the judge flagged as the turning point.";
+  return { line, aud };
+}
+function keyMoments() {
+  const t = state.traj, n = t.messages.length, s = new Set();
+  const fu = t.messages.findIndex((m) => m.role === "user"); if (fu >= 0) s.add(fu);
+  const fa = t.messages.findIndex((m) => m.role === "assistant" && m.tools && m.tools.length); if (fa >= 0) s.add(fa);
+  state.events.forEach((e) => { if (Number.isInteger(e.at)) s.add(e.at); });
+  if (Number.isInteger(t.judge.offending_index)) s.add(t.judge.offending_index);
+  s.add(n - 1);
+  return [...s].filter((i) => i >= 0 && i < n).sort((a, b) => a - b);
+}
+function nearestBeat(idx) { let bi = 0; (state.beats || []).forEach((b, i) => { if (b <= idx) bi = i; }); return bi; }
+function updateGuide() {
+  if (!state.traj) return;
+  const idx = state.cursor, t = state.traj;
+  const bn = $("#beat"); if (bn) bn.textContent = state.beats.length ? `moment ${nearestBeat(idx) + 1} of ${state.beats.length}` : "";
+  const ns = $("#narr-step"); if (ns) ns.textContent = `Step ${idx + 1} of ${t.messages.length} · ${t.messages[idx] ? t.messages[idx].role : ""}`;
+  const { line, aud } = narrate(idx);
+  const nm = $("#narr-main"); if (nm) nm.textContent = line;
+  const na = $("#narr-aud"); if (na) { na.textContent = aud; na.style.display = aud ? "" : "none"; }
+}
+function stepBeat(d) {
+  if (!state.beats.length) return;
+  state.beatI = Math.max(0, Math.min(state.beats.length - 1, nearestBeat(state.cursor) + d));
+  jumpTo(state.beats[state.beatI], true);
+}
+function walkBeats() {
+  stopPlay(); state.beatI = 0; jumpTo(state.beats[0], true);
+  state.playing = true; document.body.classList.add("walking");
+  const wb = $("#g-walk"); if (wb) wb.textContent = "❚❚ pause";
+  state.timer = setInterval(() => {
+    if (state.beatI >= state.beats.length - 1) { stopPlay(); return; }
+    state.beatI++; jumpTo(state.beats[state.beatI], true);
+  }, 2600);
+}
+function setMode(simple) {
+  state.simple = simple;
+  document.body.classList.toggle("simple", simple);
+  const b = $("#mode-toggle"); if (b) b.textContent = simple ? "Expert view ›" : "‹ Simple view";
+  try { localStorage.setItem("rlta_mode", simple ? "simple" : "expert"); } catch (e) {}
+  if (state.traj) { applyVisibility(); updateGuide(); }
+}
+
 /* ---- console rendering ------------------------------------------------- */
 function highlight(html) {
   if (!state.tq) return html;
@@ -342,7 +445,7 @@ function applyVisibility() {
   $$(".turn").forEach((el, i) => {
     const role = (el.className.match(/r-(\w+)/) || [])[1];
     el.classList.toggle("rolehide", state.hidden.has(role));
-    el.classList.toggle("future", state.playing && i > state.cursor);
+    el.classList.toggle("future", (state.playing || state.simple) && i > state.cursor);
   });
 }
 
@@ -364,7 +467,7 @@ function jumpTo(i, setCursor) {
   const n = state.traj.messages.length;
   i = Math.max(0, Math.min(n - 1, i));
   if (setCursor) state.cursor = i;
-  markCursor(); applyVisibility(); updateInspection();
+  markCursor(); applyVisibility(); updateInspection(); updateGuide();
   const el = $(`#turn-${i}`);
   if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
 }
@@ -381,7 +484,9 @@ function startPlay() {
 }
 function stopPlay() {
   state.playing = false; clearInterval(state.timer); state.timer = null;
+  document.body.classList.remove("walking");
   const b = $("#b-play"); if (b) { b.textContent = "▶ Run step-by-step"; b.classList.remove("on"); }
+  const w = $("#g-walk"); if (w) w.textContent = "▶ Walk me through it";
   applyVisibility();
 }
 
@@ -402,15 +507,18 @@ function wireControls() {
     applyVisibility();
   });
   $("#tsearch").oninput = (e) => { state.tq = e.target.value; renderConsole(); };
+  const gb = $("#g-back"); if (gb) gb.onclick = () => { stopPlay(); stepBeat(-1); };
+  const gn = $("#g-next"); if (gn) gn.onclick = () => { stopPlay(); stepBeat(1); };
+  const gw = $("#g-walk"); if (gw) gw.onclick = () => { state.playing ? stopPlay() : walkBeats(); };
 }
 
 document.addEventListener("keydown", (e) => {
   if (!state.traj) return;
   const tag = (document.activeElement || {}).tagName;
   if (tag === "INPUT") return;
-  if (e.key === "ArrowRight") { e.preventDefault(); stopPlay(); step(1); }
-  else if (e.key === "ArrowLeft") { e.preventDefault(); stopPlay(); step(-1); }
-  else if (e.key === " ") { e.preventDefault(); state.playing ? stopPlay() : startPlay(); }
+  if (e.key === "ArrowRight") { e.preventDefault(); stopPlay(); state.simple ? stepBeat(1) : step(1); }
+  else if (e.key === "ArrowLeft") { e.preventDefault(); stopPlay(); state.simple ? stepBeat(-1) : step(-1); }
+  else if (e.key === " ") { e.preventDefault(); state.playing ? stopPlay() : (state.simple ? walkBeats() : startPlay()); }
   else if (e.key === "?") openTour();
   else if (e.key === "Escape") closeTour();
 });
