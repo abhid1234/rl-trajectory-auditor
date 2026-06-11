@@ -651,7 +651,9 @@ function showImport() {
     <div class="im-bd">
       <p class="im-p">Drop a trajectory JSON below (or paste it). It runs <b>entirely in your browser</b> —
       nothing is uploaded anywhere. You get the heuristic audit, plain-English narration and step-through;
-      the LLM-judge second opinion needs the <a href="https://huggingface.co/spaces/abhid1234/rl-trajectory-auditor/tree/main" target="_blank" rel="noopener">CLI</a>.</p>
+      the LLM-judge second opinion needs the <a href="https://huggingface.co/spaces/abhid1234/rl-trajectory-auditor/tree/main" target="_blank" rel="noopener">CLI</a>.
+      A file may hold <b>several</b> trajectories (JSON array / JSONL) — each becomes its own entry;
+      re-importing the same one replaces it.</p>
       <div class="im-drop" id="im-drop">drag &amp; drop a <code>.json</code> / <code>.jsonl</code> file here<br/><span class="dim">or</span><br/>
         <label class="im-file">choose a file<input type="file" id="im-file" accept=".json,.jsonl,application/json" hidden /></label></div>
       <textarea id="im-text" class="im-text" placeholder='or paste JSON — either OpenAI-style {"task_id": ..., "messages": [...], "patch": ..., "test_results": {...}} or an HF SWE-rebench row {"trajectory": [...], "instance_id": ...}'></textarea>
