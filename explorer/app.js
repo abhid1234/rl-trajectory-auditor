@@ -30,6 +30,7 @@ const state = {
   filter: "disagree", q: "",
   cursor: 0, playing: false, timer: null, hidden: new Set(), tq: "",
   simple: true, beats: [], beatI: 0,
+  forkGroups: {}, challenge: false, guessed: false, score: { n: 0, hit: 0 },
 };
 
 /* ----------------------------------------------------------------------- */
@@ -41,6 +42,7 @@ async function boot() {
     ]);
     state.summary = summary;
     state.index = index.cards || [];
+    buildForkGroups();
     renderTop();
     buildRailFilters();
     applyRailFilter(state.filter);
@@ -48,7 +50,20 @@ async function boot() {
     state.simple = initSimple; document.body.classList.toggle("simple", initSimple);
     const mt = $("#mode-toggle");
     if (mt) { mt.textContent = initSimple ? "Expert view ›" : "‹ Simple view"; mt.onclick = () => setMode(!state.simple); }
-    if (state.view.length) select(state.view[0].trajectory_id);
+    const F = $("#btn-finding"); if (F) F.onclick = showLanding;
+    const S = $("#btn-share"); if (S) S.onclick = share;
+    const K = $("#btn-keys"); if (K) K.onclick = showShortcuts;
+    const C = $("#btn-challenge"); if (C) C.onclick = toggleChallenge;
+    // deep-link: #<trajectory_id>/<step> opens that trace directly and skips the landing
+    const hz = parseHash();
+    const target = hz && state.index.find((c) => c.trajectory_id === hz.id);
+    if (target) {
+      select(hz.id, hz.step);
+    } else {
+      if (state.view.length) select(state.view[0].trajectory_id);
+      let seen = false; try { seen = !!sessionStorage.getItem("rlta_seen"); } catch (e) {}
+      if (!seen) showLanding();
+    }
   } catch (e) {
     $("#insp").innerHTML = `<div class="empty">No audit data found. Run the export, then reload.</div>`;
   }
@@ -113,7 +128,7 @@ function renderRail() {
 }
 
 /* ---- load + render one trajectory ------------------------------------- */
-async function select(id) {
+async function select(id, step) {
   state.cur = id;
   $$(".tnav").forEach((b) => b.classList.remove("active"));
   renderRail();
@@ -125,12 +140,11 @@ async function select(id) {
     $("#insp").innerHTML = `<div class="empty">Could not load this trace.</div>`;
     return;
   }
-  // reset interaction state, default cursor = offending (or end)
   stopPlay();
-  const off = state.traj.judge.offending_index;
-  state.cursor = (Number.isInteger(off) ? off : state.traj.messages.length - 1);
-  state.playing = false; state.hidden = new Set(); state.tq = "";
-  renderInspector();
+  state.playing = false; state.hidden = new Set(); state.tq = ""; state.guessed = false;
+  renderInspector();                 // sets cursor by mode (Simple→first beat)
+  if (Number.isInteger(step)) jumpTo(Math.max(0, Math.min(state.traj.messages.length - 1, step)), true);
+  updateHash();
 }
 
 function chip(who, diag, cat, conf) {
@@ -145,19 +159,28 @@ function renderInspector() {
   const ts = t.test_split || {};
   const teach = TEACH[t.heuristic.category] || TEACH._default;
   const insp = $("#insp");
+  const hideVerdict = state.challenge && !state.guessed;
+  const judgeChip = hideVerdict
+    ? `<div class="chipv guess-chip"><span class="who">LLM judge</span><span class="dg">?</span><span class="ct">you guess first ↓</span></div>`
+    : chip("LLM judge", t.judge.diagnosis, t.judge.category, t.judge.confidence);
+  const vmarkHtml = hideVerdict
+    ? `<span class="vmark q">vs</span>`
+    : `<span class="vmark ${t.agree ? "agr" : "dis"}">${t.agree ? "✓ agree" : "✗ disagree"}</span>`;
   insp.innerHTML = `
     <div class="hd">
       <div class="task">${esc(t.task_id)}</div>
       <div class="sub"><span>repo <b>${esc(t.repo || "—")}</b></span><span>model <b>${esc(t.model || "—")}</b></span><span><b>${t.messages.length}</b> messages</span></div>
       <div class="faceoff">
         ${chip("Heuristic", t.heuristic.diagnosis, t.heuristic.category, t.heuristic.confidence)}
-        <span class="vmark ${t.agree ? "agr" : "dis"}">${t.agree ? "✓ agree" : "✗ disagree"}</span>
-        ${chip("LLM judge", t.judge.diagnosis, t.judge.category, t.judge.confidence)}
+        ${vmarkHtml}
+        ${judgeChip}
         <div class="ts">
           <span class="tsb ${ts.gen >= 1 && ts.gold < 1 ? "good" : ""}">self-test <b>${ts.gen ?? "—"}</b></span>
           <span class="tsb ${ts.gold < 1 && ts.gen >= 1 ? "bad" : "good"}">gold-test <b>${ts.gold ?? "—"}</b></span>
         </div>
       </div>
+      <div class="guessbar" id="guessbar"></div>
+      <div class="extras" id="extras"></div>
       <div class="teach"><span class="icn">✦</span><span class="tx">${teach}</span><button class="x" title="dismiss" onclick="this.parentElement.remove()">×</button></div>
     </div>
 
@@ -195,6 +218,8 @@ function renderInspector() {
     </div>`;
 
   wireControls();
+  renderExtras();
+  renderGuessbar();
   computeEvents();
   state.beats = keyMoments();
   const off0 = state.traj.judge.offending_index;
@@ -205,6 +230,21 @@ function renderInspector() {
   renderMinimap();
   renderConsole();
   jumpTo(state.cursor, false);
+}
+
+function renderExtras() {
+  const t = state.traj, host = $("#extras"); if (!host) return;
+  host.innerHTML = `<button class="extrabtn" id="x-patch">📄 The agent's patch</button>` + forkLinksHtml(t);
+  const pb = $("#x-patch"); if (pb) pb.onclick = showPatch;
+  host.querySelectorAll(".forklink").forEach((b) => { b.onclick = () => select(b.dataset.id); });
+}
+function renderGuessbar() {
+  const host = $("#guessbar"); if (!host) return;
+  if (!(state.challenge && !state.guessed)) { host.innerHTML = ""; return; }
+  const opts = ["HARNESS", "TRAINING", "PRODUCT", "CLEAN", "BOTH"];
+  host.innerHTML = `<span class="gb-q">Your call — why did this run fail?</span>` +
+    opts.map((o) => `<button class="gb d-${o}" data-d="${o}">${o}</button>`).join("");
+  host.querySelectorAll(".gb").forEach((b) => { b.onclick = () => makeGuess(b.dataset.d); });
 }
 
 /* ---- live inspection engine (audit-along) ------------------------------ */
@@ -387,6 +427,112 @@ function setMode(simple) {
   if (state.traj) { applyVisibility(); updateGuide(); }
 }
 
+/* ---- front-door finding page ------------------------------------------- */
+function renderLanding() {
+  const s = state.summary, rh = s.reward_hack || {};
+  const bars = (s.distribution || []).map((d) =>
+    `<div class="lrow"><span class="ln">${esc(d.label)}</span>` +
+    `<span class="lt"><span class="lf" style="width:${d.pct}%"></span></span>` +
+    `<span class="lp">${d.pct}%</span></div>`).join("");
+  $("#landing").innerHTML = `<div class="land-card">
+    <div class="land-k">A forensic audit · ${(s.n || 0).toLocaleString()} real RL agent trajectories</div>
+    <h1 class="land-h">I read ${(s.n || 0).toLocaleString()} RL agent trajectories<br>so you don't have to.</h1>
+    <p class="land-sub">Teams ship broken models because nobody reads their training traces. So a cheap heuristic and an LLM judge read all of them — and disagreed in a telling way.</p>
+    <div class="land-stats">
+      <div class="ls"><div class="ls-v">${rh.judge_corrects_pct}%</div><div class="ls-l">of the heuristic's <b>${(rh.false_positives || 0).toLocaleString()}</b> reward-hack false alarms are overturned by the judge, toward ground truth.</div></div>
+      <div class="ls"><div class="ls-v">${n2(rh.heuristic_precision)} <span class="arr">→</span> <b>${n2(rh.judge_precision)}</b></div><div class="ls-l">reward-hack precision — a regex heuristic vs. an LLM that actually reads the trace.</div></div>
+    </div>
+    <div class="land-dist"><div class="land-dist-h">What 5,000 trajectories actually fail at</div>${bars}</div>
+    <p class="land-take">You can't trust surface signals — or aggregate eval metrics. You have to read the trajectories. This tool lets you.</p>
+    <button id="land-go" class="land-go">Explore the trajectories →</button>
+    <div class="land-foot">source · nebius/SWE-rebench-openhands-trajectories &nbsp;·&nbsp; judge · Gemini 2.5 Flash</div>
+  </div>`;
+  $("#land-go").onclick = hideLanding;
+}
+function showLanding() { renderLanding(); $("#landing").hidden = false; document.body.classList.add("landing-on"); }
+function hideLanding() { $("#landing").hidden = true; document.body.classList.remove("landing-on"); try { sessionStorage.setItem("rlta_seen", "1"); } catch (e) {} }
+
+/* ---- fork cross-links -------------------------------------------------- */
+function buildForkGroups() {
+  state.forkGroups = {};
+  state.index.forEach((c) => { if (c.fork) (state.forkGroups[c.fork] = state.forkGroups[c.fork] || []).push(c); });
+}
+function forkLinksHtml(t) {
+  const f = (t.heuristic.signals || {}).fork_pattern;
+  if (!f) return "";
+  const grp = (state.forkGroups[f] || []).filter((c) => c.trajectory_id !== t.trajectory_id);
+  if (!grp.length) return "";
+  const chips = grp.slice(0, 10).map((c) => `<button class="forklink" data-id="${esc(c.trajectory_id)}">${esc(c.task_id)}</button>`).join("");
+  return `<div class="forkbox"><div class="fork-h">🔁 ${grp.length} other agent${grp.length > 1 ? "s" : ""} got stuck on the very same move sequence</div>` +
+    `<code class="fork-seq">${esc(f)}</code><div class="fork-links">${chips}</div></div>`;
+}
+
+/* ---- the agent's patch ------------------------------------------------- */
+function showPatch() {
+  const t = state.traj, p = t.patch || "", gold = (t.test_split || {}).gold;
+  const ok = gold >= 1;
+  const body = p.trim() ? renderDiff(p) : `<p class="pm-empty">No code patch was recorded for this trajectory.</p>`;
+  $("#patch-modal").innerHTML = `<div class="sc-card pm">
+    <div class="sc-hd"><h2>The agent's patch — what it actually changed</h2><button class="sc-x" data-close>×</button></div>
+    <div class="pm-banner ${ok ? "ok" : "bad"}">Gold test: <b>${ok ? "PASS" : "FAIL"}</b> — ${ok ? "this change really did fix the task." : "so whatever this edits, it did <b>not</b> fix the real bug. Read it critically."}</div>
+    <div class="pm-diff">${body}</div></div>`;
+  openOverlay("#patch-modal");
+}
+
+/* ---- challenge mode ---------------------------------------------------- */
+function updateChallengeBtn() {
+  const b = $("#btn-challenge"); if (!b) return;
+  b.classList.toggle("on", state.challenge);
+  b.textContent = state.challenge ? `🎯 Score ${state.score.hit}/${state.score.n}` : "🎯 Challenge";
+}
+function toggleChallenge() {
+  state.challenge = !state.challenge;
+  document.body.classList.toggle("challenge", state.challenge);
+  if (state.traj) { state.guessed = false; renderInspector(); }
+  updateChallengeBtn();
+}
+function makeGuess(dx) {
+  state.guessed = true;
+  state.score.n++; if (dx === state.traj.judge.diagnosis) state.score.hit++;
+  updateChallengeBtn(); renderInspector();
+  toast(dx === state.traj.judge.diagnosis ? "✓ You matched the judge!" : `✗ Judge said ${state.traj.judge.diagnosis}`);
+}
+
+/* ---- deep-links · share · shortcuts ------------------------------------ */
+function updateHash() {
+  if (!state.cur) return;
+  try { history.replaceState(null, "", "#" + encodeURIComponent(state.cur) + "/" + state.cursor); } catch (e) {}
+}
+function parseHash() {
+  const h = (location.hash || "").replace(/^#/, "");
+  if (!h) return null;
+  const slash = h.lastIndexOf("/");
+  const id = slash > 0 ? h.slice(0, slash) : h;
+  const step = slash > 0 ? parseInt(h.slice(slash + 1), 10) : 0;
+  try { return { id: decodeURIComponent(id), step: isNaN(step) ? 0 : step }; } catch (e) { return null; }
+}
+function toast(msg) { const t = $("#toast"); if (!t) return; t.textContent = msg; t.classList.add("on"); clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove("on"), 1900); }
+function share() {
+  const url = location.href;
+  if (navigator.clipboard) navigator.clipboard.writeText(url).then(() => toast("Link copied — shares this exact trajectory + step")).catch(() => toast(url));
+  else toast(url);
+}
+function openOverlay(sel) {
+  const el = $(sel); el.hidden = false;
+  el.onclick = (e) => { if (e.target === el || (e.target.closest && e.target.closest("[data-close]"))) el.hidden = true; };
+}
+function showShortcuts() {
+  $("#shortcuts").innerHTML = `<div class="sc-card"><div class="sc-hd"><h2>Keyboard & tips</h2><button class="sc-x" data-close>×</button></div>
+    <ul class="sc-list">
+      <li><kbd>→</kbd> <kbd>←</kbd> next / previous step <span class="dim">(or key moment in Simple view)</span></li>
+      <li><kbd>space</kbd> play the run / walk the key moments</li>
+      <li><kbd>?</kbd> guided tour &nbsp;·&nbsp; <kbd>h</kbd> this help</li>
+      <li>In <b>Expert view</b>, click the <b>minimap</b> ticks to jump anywhere, and watch the detectors fire live.</li>
+      <li><b>🎯 Challenge</b> hides the judge so you can guess first. <b>⤴ Share</b> copies a link to the exact view.</li>
+    </ul></div>`;
+  openOverlay("#shortcuts");
+}
+
 /* ---- console rendering ------------------------------------------------- */
 function highlight(html) {
   if (!state.tq) return html;
@@ -467,7 +613,7 @@ function jumpTo(i, setCursor) {
   const n = state.traj.messages.length;
   i = Math.max(0, Math.min(n - 1, i));
   if (setCursor) state.cursor = i;
-  markCursor(); applyVisibility(); updateInspection(); updateGuide();
+  markCursor(); applyVisibility(); updateInspection(); updateGuide(); updateHash();
   const el = $(`#turn-${i}`);
   if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
 }
@@ -520,7 +666,8 @@ document.addEventListener("keydown", (e) => {
   else if (e.key === "ArrowLeft") { e.preventDefault(); stopPlay(); state.simple ? stepBeat(-1) : step(-1); }
   else if (e.key === " ") { e.preventDefault(); state.playing ? stopPlay() : (state.simple ? walkBeats() : startPlay()); }
   else if (e.key === "?") openTour();
-  else if (e.key === "Escape") closeTour();
+  else if (e.key === "h" || e.key === "H") showShortcuts();
+  else if (e.key === "Escape") { closeTour(); ["#landing", "#shortcuts", "#patch-modal"].forEach((s) => { const el = $(s); if (el) el.hidden = true; }); document.body.classList.remove("landing-on"); }
 });
 
 /* ---- tooltips ---------------------------------------------------------- */

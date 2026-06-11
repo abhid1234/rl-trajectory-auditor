@@ -214,6 +214,7 @@ def build_full_explorer(audit_run: dict, work_dir: str, out_dir: str, max_cards:
             "judge_diagnosis": v.get("diagnosis"), "judge_category": v.get("failure_category"),
             "agree": agree, "n_messages": len(msgs),
             "offending_index": v.get("offending_message_index"),
+            "fork": (d.get("signals") or {}).get("fork_pattern"),
         })
         full = {
             "trajectory_id": tid, "task_id": t.get("task_id", tid), "repo": t.get("repo", ""),
