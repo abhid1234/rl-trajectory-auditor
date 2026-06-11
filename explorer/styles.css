@@ -32,6 +32,9 @@
 }
 
 * { box-sizing:border-box; }
+/* the hidden attribute must win over .landing/.overlay-sc display rules below,
+   or a skipped (empty) overlay would cover the whole page */
+[hidden] { display:none !important; }
 html,body { height:100%; }
 body {
   margin:0; background:var(--paper); color:var(--ink);
