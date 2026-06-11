@@ -651,7 +651,7 @@ function showImport() {
     <div class="im-bd">
       <p class="im-p">Drop a trajectory JSON below (or paste it). It runs <b>entirely in your browser</b> —
       nothing is uploaded anywhere. You get the heuristic audit, plain-English narration and step-through;
-      the LLM-judge second opinion needs the <a href="https://huggingface.co/spaces/abhid1234/rl-trajectory-auditor/tree/main" target="_blank" rel="noopener">CLI</a>.
+      the LLM-judge second opinion needs the <a href="https://github.com/abhid1234/rl-trajectory-auditor" target="_blank" rel="noopener">CLI</a>.
       A file may hold <b>several</b> trajectories (JSON array / JSONL) — each becomes its own entry;
       re-importing the same one replaces it.</p>
       <div class="im-drop" id="im-drop">drag &amp; drop a <code>.json</code> / <code>.jsonl</code> file here<br/><span class="dim">or</span><br/>

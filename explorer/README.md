@@ -27,4 +27,4 @@ The LLM-judge second opinion runs via the project CLI.
 + `data/traj/`; there is no backend and no API key. Regenerate the data with the
 project's `python -m src.pipeline.export_explorer --full <audit_run.json> <staged-dir> data`.
 
-Method, detectors, and the full validation numbers are in the project README.
+Code, method, and the full validation numbers: https://github.com/abhid1234/rl-trajectory-auditor
