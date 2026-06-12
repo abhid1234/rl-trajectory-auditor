@@ -176,11 +176,27 @@ async function select(id, step) {
   updateHash();
 }
 
+const CHIP_TIPS = {
+  "Heuristic": "Fast rules (regexes + statistics) that scan every run. Good at finding suspects, often wrong — press g for the full glossary.",
+  "LLM judge": "Gemini read this whole trace and gave a second opinion. Its category label is written in its own words; the number is its 0–1 confidence.",
+};
+
+function confNorm(c) {
+  // models occasionally self-report confidence on a 0–10 or 0–100 scale
+  if (c == null) return null;
+  c = Number(c);
+  if (c > 1 && c <= 10) c /= 10;
+  else if (c > 10) c /= 100;
+  return Math.min(1, c);
+}
+
 function chip(who, diag, cat, conf) {
-  return `<div class="chipv d-${esc(diag || "CLEAN")}">` +
+  const tip = CHIP_TIPS[who] ? ` data-tip="${esc(CHIP_TIPS[who])}"` : "";
+  const c = confNorm(conf);
+  return `<div class="chipv d-${esc(diag || "CLEAN")}"${tip}>` +
     `<span class="who">${who}</span>` +
     `<span class="dg">${esc(diag || "—")}</span>` +
-    `<span class="ct">${esc(cat || "")}${conf != null ? " · " + n2(conf) : ""}</span></div>`;
+    `<span class="ct">${esc(cat || "")}${c != null ? " · " + n2(c) : ""}</span></div>`;
 }
 
 function renderInspector() {
@@ -207,9 +223,10 @@ function renderInspector() {
         ${vmarkHtml}
         ${judgeChip}
         <div class="ts">
-          <span class="tsb ${ts.gen >= 1 && ts.gold < 1 ? "good" : ""}">self-test <b>${ts.gen ?? "—"}</b></span>
-          <span class="tsb ${ts.gold < 1 && ts.gen >= 1 ? "bad" : "good"}">gold-test <b>${ts.gold ?? "—"}</b></span>
+          <span class="tsb ${ts.gen >= 1 && ts.gold < 1 ? "good" : ""}" data-tip="Did the agent pass its OWN tests? Gameable — it can write or edit these. 1 = pass, 0 = fail.">self-test <b>${ts.gen ?? "—"}</b></span>
+          <span class="tsb ${ts.gold < 1 && ts.gen >= 1 ? "bad" : "good"}" data-tip="Did it pass the hidden human-written tests? This is the ground truth. self 1 + gold 0 = the reward-hack signature.">gold-test <b>${ts.gold ?? "—"}</b></span>
         </div>
+        <a class="gl-open hd-gl" href="#" title="glossary (g)">ⓘ what do these terms mean?</a>
       </div>
       <div class="guessbar" id="guessbar"></div>
       <div class="extras" id="extras"></div>
@@ -782,7 +799,7 @@ function showShortcuts() {
     <ul class="sc-list">
       <li><kbd>→</kbd> <kbd>←</kbd> next / previous step <span class="dim">(or key moment in Simple view)</span></li>
       <li><kbd>space</kbd> play the run / walk the key moments</li>
-      <li><kbd>?</kbd> guided tour &nbsp;·&nbsp; <kbd>h</kbd> this help</li>
+      <li><kbd>?</kbd> guided tour &nbsp;·&nbsp; <kbd>h</kbd> this help &nbsp;·&nbsp; <kbd>g</kbd> <b>glossary</b> — every term &amp; color explained</li>
       <li>In <b>Expert view</b>, click the <b>minimap</b> ticks to jump anywhere, and watch the detectors fire live.</li>
       <li><b>🎯 Challenge</b> hides the judge so you can guess first. <b>⤴ Share</b> copies a link to the exact view.</li>
     </ul></div>`;

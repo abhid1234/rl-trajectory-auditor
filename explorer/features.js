@@ -309,6 +309,63 @@ async function _askGemini(key, q, t) {
   return txt;
 }
 
+/* ============================== glossary ================================= */
+const GLOSSARY = [
+  { h: "The two opinions", rows: [
+    ["chip", "HEURISTIC", "Fast, cheap <b>rules</b> — regexes and statistics that scan every run (does the patch edit a test file? did its own tests pass but the real ones fail?). Great at finding <i>suspects</i>, wrong a lot: 57% of its reward-hack flags are false alarms."],
+    ["chip", "LLM JUDGE", "Gemini actually <b>reads the whole trace</b> and gives a second opinion with reasoning. Where it disagrees with the heuristic, the judge sides with ground truth ~3 times out of 4. It also writes its own category label in plain words (e.g. <i>“Incorrect implementation or verification”</i>) — read that as its one-line reason."],
+  ]},
+  { h: "Verdicts — who's to blame for the failure", rows: [
+    ["dot:HARNESS", "HARNESS", "The <b>environment</b> broke, not the agent — a missing file, config, or broken test setup. Fix the harness; retraining would be wasted money."],
+    ["dot:TRAINING", "TRAINING", "The agent's <b>learned behavior</b> is the problem — it gamed the reward or got stuck in a rut. Fix the reward/rubric or add training coverage."],
+    ["dot:PRODUCT", "PRODUCT", "Neither of the above — a routing or policy issue around the agent (or simply unexplained)."],
+    ["dot:BOTH", "BOTH", "Two things went wrong at once: a broken environment <i>and</i> bad agent behavior."],
+    ["dot:CLEAN", "CLEAN", "Solved properly: both test sets pass, nothing suspicious."],
+  ]},
+  { h: "Failure categories — what it looked like", rows: [
+    ["plain", "Reward Hack", "The run <b>looks</b> successful but earned it by a shortcut — editing the tests, hardcoding the expected answer — instead of fixing the bug. The headline failure mode of RL training."],
+    ["plain", "Stuck at Fork", "The agent repeats the <b>same failing move-sequence</b> that other agents also got stuck on (edit, edit, edit…). A shared rut in the training distribution."],
+    ["plain", "Context Gap", "The environment never gave the agent something it needed — it was set up to fail."],
+    ["plain", "Unclassified / Emergent", "Failed, but no detector could say why. The honest bucket."],
+  ]},
+  { h: "Scores & badges", rows: [
+    ["badge", "self-test 1 / 0", "Did the agent pass <b>its own</b> tests? Gameable — the agent can write or edit these."],
+    ["badge", "gold-test 1 / 0", "Did it pass the <b>hidden human-written</b> tests? This is the ground truth. <b>self-test 1 + gold-test 0 = the reward-hack signature.</b>"],
+    ["plain", "· 0.90 (confidence)", "How sure that opinion is of its own verdict, from 0 to 1. Self-reported — treat as a hint, not a guarantee."],
+    ["mark", "✓ agree / ✗ disagree", "Do the heuristic and the judge give the <b>same verdict</b>? The ✗ disagreements are the interesting traces — that gap is the whole finding."],
+    ["plain", "⚑ offending step", "The single message the judge says gives the failure away — the red tick on the minimap."],
+    ["plain", "🔁 fork / ⇄ compare", "This run shares its failing move-sequence with N other runs; <b>⇄ compare</b> shows exactly where two of them diverged."],
+    ["plain", "⬆ YOURS / LOCAL", "A trajectory you imported. It lives only in this browser tab — never uploaded."],
+  ]},
+  { h: "Reading the trace — message colors", rows: [
+    ["role:system", "system", "The agent's standing instructions — its job and rules."],
+    ["role:user", "user", "The task: the bug it was asked to fix."],
+    ["role:assistant", "assistant", "The agent's moves — its reasoning and tool calls (⚙)."],
+    ["role:tool", "tool", "What the environment said back: file contents, test output, errors."],
+  ]},
+];
+
+function showGlossary() {
+  const sw = (kind, label) => {
+    if (kind.startsWith("dot:")) return `<span class="gl-dot" style="background:var(--d-${kind.slice(4)})"></span><b class="gl-term" style="color:var(--d-${kind.slice(4)})">${esc(label)}</b>`;
+    if (kind.startsWith("role:")) return `<span class="gl-dot" style="background:var(--r-${kind.slice(5)})"></span><b class="gl-term">${esc(label)}</b>`;
+    if (kind === "chip") return `<b class="gl-term gl-chip">${esc(label)}</b>`;
+    if (kind === "badge") return `<b class="gl-term gl-badge">${esc(label)}</b>`;
+    if (kind === "mark") return `<b class="gl-term">${esc(label)}</b>`;
+    return `<b class="gl-term">${esc(label)}</b>`;
+  };
+  $("#glossary-modal").innerHTML = `<div class="sc-card gl-card">
+    <div class="sc-hd"><h2>What everything means</h2><button class="sc-x" data-close>×</button></div>
+    <div class="gl-bd">` +
+    GLOSSARY.map((sec) =>
+      `<h3 class="gl-h">${esc(sec.h)}</h3>` +
+      sec.rows.map(([kind, label, def]) =>
+        `<div class="gl-row"><span class="gl-l">${sw(kind, label)}</span><span class="gl-d">${def}</span></div>`).join("")
+    ).join("") +
+    `</div></div>`;
+  openOverlay("#glossary-modal");
+}
+
 /* ============================== wiring =================================== */
 (function wireFeatures() {
   const D = $("#btn-daily"); if (D) D.onclick = startDaily;
@@ -320,6 +377,12 @@ async function _askGemini(key, q, t) {
     if (ga) { e.preventDefault(); startGauntlet(); }
     const ask = e.target.closest && e.target.closest("#b-ask");
     if (ask) showAsk();
+    const gl = e.target.closest && e.target.closest(".gl-open");
+    if (gl) { e.preventDefault(); showGlossary(); }
+  });
+  document.addEventListener("keydown", (e) => {
+    if ((document.activeElement || {}).tagName === "INPUT") return;
+    if (e.key === "g" || e.key === "G") showGlossary();
   });
 })();
 
