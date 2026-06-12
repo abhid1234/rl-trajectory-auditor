@@ -279,7 +279,8 @@ function renderInspector() {
   renderInspectPanel();
   renderMinimap();
   renderConsole();
-  jumpTo(state.cursor, false);
+  jumpTo(state.cursor, false, true);   // position the cursor WITHOUT scrolling…
+  const sc = $("#insp"); if (sc) sc.scrollTop = 0;   // …a fresh trace always opens at the top
 }
 
 function renderExtras() {
@@ -882,14 +883,14 @@ function markCursor() {
 }
 
 /* ---- navigation + playback -------------------------------------------- */
-function jumpTo(i, setCursor) {
+function jumpTo(i, setCursor, noScroll) {
   const n = state.traj.messages.length;
   i = Math.max(0, Math.min(n - 1, i));
   if (setCursor) state.cursor = i;
   markCursor(); applyVisibility(); updateInspection(); updateGuide(); updateHash();
   const el = $(`#turn-${i}`);
   const sc = $("#insp");
-  if (el && sc) {
+  if (el && sc && !noScroll) {
     // anchor explicitly to the scrolling column (scrollIntoView is unreliable here)
     const top = el.getBoundingClientRect().top - sc.getBoundingClientRect().top
               + sc.scrollTop - sc.clientHeight * 0.35;
