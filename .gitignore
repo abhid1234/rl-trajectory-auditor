@@ -1,7 +1,13 @@
 *.db
+docs/blog.html
+docs/BLOG_POST.md
+docs/SOCIAL_POSTS.md
 *.egg-info/
 .env
+explorer/blog.html
 explorer/data/
+explorer/images/
+explorer/.vercel/
 out.json
 *.pyc
 __pycache__/
@@ -11,4 +17,3 @@ run5k/
 run_inspector_dev/
 run_validate200/
 trajectories/
-explorer/.vercel/

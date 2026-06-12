@@ -3,7 +3,7 @@
    all judged runs), Trajectory Diff (fork divergence), and Ask-the-trace
    (BYO-key Gemini chat). Classic script; uses app.js globals. */
 
-const SITE_URL = "https://abhid1234-rl-trajectory-auditor.static.hf.space";
+const SITE_URL = location.origin + location.pathname.replace(/index\.html$/, "").replace(/\/$/, "");
 const DAILY_EPOCH = Date.UTC(2026, 5, 1);            // specimen #1 = 2026-06-01
 
 /* ====================== quiz engine (daily + gauntlet) =================== */
