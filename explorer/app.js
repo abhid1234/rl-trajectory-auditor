@@ -774,8 +774,10 @@ function showImport() {
 
 /* ---- deep-links · share · shortcuts ------------------------------------ */
 function updateHash() {
+  // address bar carries only the TRACE — so a refresh reopens it at the top.
+  // The step number goes only into Share-copied links (see share()).
   if (!state.cur) return;
-  try { history.replaceState(null, "", "#" + encodeURIComponent(state.cur) + "/" + state.cursor); } catch (e) {}
+  try { history.replaceState(null, "", "#" + encodeURIComponent(state.cur)); } catch (e) {}
 }
 function parseHash() {
   const h = (location.hash || "").replace(/^#/, "");
@@ -787,7 +789,9 @@ function parseHash() {
 }
 function toast(msg) { const t = $("#toast"); if (!t) return; t.textContent = msg; t.classList.add("on"); clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove("on"), 1900); }
 function share() {
-  const url = location.href;
+  const url = state.cur
+    ? location.origin + location.pathname + "#" + encodeURIComponent(state.cur) + "/" + state.cursor
+    : location.href;
   if (navigator.clipboard) navigator.clipboard.writeText(url).then(() => toast("Link copied — shares this exact trajectory + step")).catch(() => toast(url));
   else toast(url);
 }
