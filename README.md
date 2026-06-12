@@ -6,7 +6,7 @@ Audit RL training trajectories and automatically classify each failure as a
 
 > Teams ship broken models because nobody reads their trajectories. This reads them.
 
-**🔬 Live demo — The Inspector:** https://abhid1234-rl-trajectory-auditor.static.hf.space
+**🔬 Live demo — The Inspector:** https://rl-trajectory-auditor.vercel.app (mirror: [HF Space](https://huggingface.co/spaces/abhid1234/rl-trajectory-auditor))
 — step through 200 fully-loaded real trajectories from a **5,000-trajectory audit**, watch the
 detectors fire live, or drop in your own trajectory JSON (it never leaves your browser).
 
