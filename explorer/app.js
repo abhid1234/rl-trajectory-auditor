@@ -554,7 +554,7 @@ function renderLanding() {
     `<span class="lp">${d.pct}%</span></div>`).join("");
   $("#landing").innerHTML = `<div class="land-card">
     <div class="land-k">A forensic audit · ${(s.n || 0).toLocaleString()} real RL agent trajectories</div>
-    <h1 class="land-h">I read ${(s.n || 0).toLocaleString()} RL agent trajectories<br>so you don't have to.</h1>
+    <h1 class="land-h">Nobody reads their trajectories.<br>So we audited ${(s.n || 0).toLocaleString()}.</h1>
     <p class="land-sub">Teams ship broken models because nobody reads their training traces. So a cheap heuristic and an LLM judge read all of them — and disagreed in a telling way.
       <a class="prim-jump" href="#primer">New to trajectories? 90-second primer ↓</a></p>
     <div class="land-stats">
