@@ -2,7 +2,7 @@
 
 > **Scale:** 5,000 trajectories audited; **4,453 judged** by the LLM (flagged + control), 3 errors.
 > **Dataset:** `nebius/SWE-rebench-openhands-trajectories` (public, 67,074 trajectories).
-> **Judge:** Gemini 2.5 Flash, via stdlib REST. **Total spend ≈ $0.40.**
+> **Judge:** Gemini 2.5 Flash, via stdlib REST.
 
 ## Headline
 
@@ -71,7 +71,7 @@ the model — exactly the kind of thing you only catch by auditing at scale.
 ## Reproduce
 
 ```bash
-python -m src.pipeline.cli audit --limit 5000 --control 0.1 --max-cost 12 \
+python -m src.pipeline.cli audit --limit 5000 --control 0.1 \
   --work-dir <disk-path> --out-dir ./run5k --db ./run5k/exp.db
 python -m src.pipeline.export_explorer --full run5k/audit_run.json <disk-path> explorer/data
 # → run5k/{audit_run,validation_report}.json + the interactive explorer dataset
