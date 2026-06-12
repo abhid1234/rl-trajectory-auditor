@@ -606,3 +606,6 @@ kbd { font-family:var(--mono); font-size:11px; padding:2px 7px; border:1px solid
 .ask-key:focus { outline:1.5px solid var(--oxblood); }
 .ask-a { margin-top:14px; padding:13px 15px; background:var(--paper-2); border-left:3px solid var(--oxblood);
   border-radius:0 5px 5px 0; font-size:14px; line-height:1.6; white-space:pre-wrap; }
+.fork-hint { font-weight:400; font-size:11.5px; color:var(--ink-soft); font-style:italic; }
+.fork-hint b { color:var(--d-BOTH); font-style:normal; }
+.fork-diff { font-weight:700; }

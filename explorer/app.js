@@ -569,10 +569,11 @@ function forkLinksHtml(t) {
   if (!f) return "";
   const grp = (state.forkGroups[f] || []).filter((c) => c.trajectory_id !== t.trajectory_id);
   if (!grp.length) return "";
-  const chips = grp.slice(0, 10).map((c) =>
+  const chips = grp.slice(0, 8).map((c) =>
     `<span class="forkpair"><button class="forklink" data-id="${esc(c.trajectory_id)}">${esc(c.task_id)}</button>` +
-    `<button class="fork-diff" data-id="${esc(c.trajectory_id)}" title="compare paths: where did these two agents diverge?">⇄</button></span>`).join("");
-  return `<div class="forkbox"><div class="fork-h">🔁 ${grp.length} other agent${grp.length > 1 ? "s" : ""} got stuck on the very same move sequence</div>` +
+    `<button class="fork-diff" data-id="${esc(c.trajectory_id)}" title="see where these two agents' paths split">⇄ compare</button></span>`).join("");
+  return `<div class="forkbox"><div class="fork-h">🔁 ${grp.length} other agent${grp.length > 1 ? "s" : ""} got stuck on the very same move sequence` +
+    ` <span class="fork-hint">— hit <b>⇄ compare</b> to see exactly where two runs diverged</span></div>` +
     `<code class="fork-seq">${esc(f)}</code><div class="fork-links">${chips}</div></div>`;
 }
 
