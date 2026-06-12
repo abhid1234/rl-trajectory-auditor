@@ -567,7 +567,7 @@ function renderLanding() {
     <a id="land-gauntlet" class="land-alt" href="#">…or test yourself: the 10-trace gauntlet 🎯</a>
     ${PRIMER_HTML}
     <button id="land-go2" class="land-go">Got it — let me explore →</button>
-    <div class="land-foot">source · nebius/SWE-rebench-openhands-trajectories &nbsp;·&nbsp; judge · Gemini 2.5 Flash &nbsp;·&nbsp; <a href="https://github.com/abhid1234/rl-trajectory-auditor" target="_blank" rel="noopener">code</a> &nbsp;·&nbsp; <a href="story.html">📖 read: The Pileup — 51 agents, one trap</a></div>
+    <div class="land-foot">source · nebius/SWE-rebench-openhands-trajectories &nbsp;·&nbsp; judge · Gemini 2.5 Flash &nbsp;·&nbsp; <a href="https://github.com/abhid1234/rl-trajectory-auditor" target="_blank" rel="noopener">code</a> &nbsp;·&nbsp; <a href="story.html">📖 read: The Pileup — 51 agents, one trap</a> &nbsp;·&nbsp; <a href="https://aurielws.github.io/posts/rl-pet-peeves-part-1/" target="_blank" rel="noopener">inspired by Auriel Wright ↗</a></div>
   </div>`;
   $("#land-go").onclick = hideLanding;
   $("#land-go2").onclick = hideLanding;
