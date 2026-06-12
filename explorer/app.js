@@ -247,7 +247,7 @@ function renderInspector() {
       </div>
     </div>
 
-    <div class="ctrl">
+    <div class="stickybar"><div class="ctrl">
       <div class="seg">
         <button id="b-step-b" title="step back (←)">‹ step</button>
         <button id="b-play" class="run" title="run the inspection from the start (space)">▶ Run step-by-step</button>
@@ -261,7 +261,7 @@ function renderInspector() {
       <button id="b-help" class="helpbtn" title="how to read this">? guide</button>
     </div>
 
-    <div class="minimap" id="minimap"></div>
+    <div class="minimap" id="minimap"></div></div>
     <div class="work">
       <div class="console" id="console"></div>
       <aside class="inspect" id="inspect"></aside>
@@ -888,7 +888,13 @@ function jumpTo(i, setCursor) {
   if (setCursor) state.cursor = i;
   markCursor(); applyVisibility(); updateInspection(); updateGuide(); updateHash();
   const el = $(`#turn-${i}`);
-  if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+  const sc = $("#insp");
+  if (el && sc) {
+    // anchor explicitly to the scrolling column (scrollIntoView is unreliable here)
+    const top = el.getBoundingClientRect().top - sc.getBoundingClientRect().top
+              + sc.scrollTop - sc.clientHeight * 0.35;
+    sc.scrollTo({ top: Math.max(0, top), behavior: window.__instantScroll ? "auto" : "smooth" });
+  }
 }
 function step(d) { state.cursor = Math.max(0, Math.min(state.traj.messages.length - 1, state.cursor + d)); jumpTo(state.cursor, false); }
 function startPlay() {

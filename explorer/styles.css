@@ -628,3 +628,16 @@ kbd { font-family:var(--mono); font-size:11px; padding:2px 7px; border:1px solid
 .gl-badge { border:1px solid var(--rule); background:var(--paper-2); padding:3px 8px; font-weight:400; }
 .gl-d { font-size:13px; line-height:1.55; color:var(--ink-soft); }
 .gl-d b { color:var(--ink); } .gl-d i { color:var(--ink); }
+
+/* ---- whole-column scrolling -------------------------------------------- */
+/* The inspector column scrolls as one page; the trace console grows to its
+   full content height instead of trapping scroll in a short inner window. */
+.insp { overflow-y:auto; }
+.work { flex:none; min-height:0; align-items:start; }
+.work .console { height:auto; }
+.console { overflow:visible; flex:none; min-height:55vh; }
+.stickybar { position:sticky; top:0; z-index:6; background:var(--paper); box-shadow:0 6px 14px -12px rgba(28,23,20,0.5); }
+body.simple .stickybar { position:static; box-shadow:none; }
+.inspect { position:sticky; top:92px; align-self:start; max-height:calc(100vh - 150px); overflow-y:auto; border-bottom:1px solid var(--rule); }
+.insp::-webkit-scrollbar { width:10px; }
+.insp::-webkit-scrollbar-thumb { background:var(--rule); border-radius:5px; }
