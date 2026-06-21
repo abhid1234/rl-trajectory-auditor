@@ -1,9 +1,13 @@
 *.db
 docs/blog.html
 docs/BLOG_POST.md
+docs/launch_video/
+docs/launch_video.mp4
+docs/social_posts.html
 docs/SOCIAL_POSTS.md
 *.egg-info/
 .env
+explorer/apple-touch-icon.png
 explorer/blog.html
 explorer/data/
 explorer/images/
@@ -17,5 +21,3 @@ run5k/
 run_inspector_dev/
 run_validate200/
 trajectories/
-explorer/apple-touch-icon.png
-docs/social_posts.html
