@@ -895,9 +895,13 @@ function jumpTo(i, setCursor, noScroll) {
   const el = $(`#turn-${i}`);
   const sc = $("#insp");
   if (el && sc && !noScroll) {
-    // anchor explicitly to the scrolling column (scrollIntoView is unreliable here)
+    // anchor explicitly to the scrolling column (scrollIntoView is unreliable here).
+    // In Simple mode the narration panel is pinned (position:sticky) at the top of the
+    // column, so land the target turn just below it instead of behind it.
+    const guide = document.body.classList.contains("simple") ? $("#guide") : null;
+    const pad = guide ? guide.getBoundingClientRect().height + 16 : sc.clientHeight * 0.35;
     const top = el.getBoundingClientRect().top - sc.getBoundingClientRect().top
-              + sc.scrollTop - sc.clientHeight * 0.35;
+              + sc.scrollTop - pad;
     sc.scrollTo({ top: Math.max(0, top), behavior: window.__instantScroll ? "auto" : "smooth" });
   }
 }

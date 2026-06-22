@@ -323,7 +323,8 @@ mark { background:var(--hl); color:#1b1714; border-radius:1px; padding:0 1px; }
 
 .guide { display:none; }
 body.simple .guide { display:block; padding:16px 22px 18px; border-bottom:1px solid var(--rule);
-  background:linear-gradient(180deg,var(--card),var(--paper)); }
+  background:linear-gradient(180deg,var(--card),var(--paper));
+  position:sticky; top:0; z-index:7; }
 .narr-step { font-family:var(--mono); font-size:10px; letter-spacing:0.14em; text-transform:uppercase; color:var(--ink-soft); margin-bottom:7px; }
 .narr-main { font-family:var(--display); font-weight:600; font-size:22px; line-height:1.32; margin:0; letter-spacing:-0.01em; max-width:60ch; }
 .narr-aud { font-family:var(--sans); font-size:14.5px; line-height:1.5; margin:11px 0 0; padding:9px 13px; max-width:62ch;
