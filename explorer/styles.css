@@ -612,9 +612,12 @@ kbd { font-family:var(--mono); font-size:11px; padding:2px 7px; border:1px solid
 .fork-diff { font-weight:700; }
 
 /* ---- glossary ----------------------------------------------------------- */
-.hd-gl { display:inline-block; margin-top:10px; font-family:var(--mono); font-size:11px;
-  color:var(--oxblood); text-decoration:none; border-bottom:1px dashed rgba(123,45,38,0.4); }
-.hd-gl:hover { border-bottom-style:solid; }
+.hd-gl { display:inline-flex; align-items:center; gap:6px; margin-top:12px;
+  font-family:var(--mono); font-size:12.5px; font-weight:700; letter-spacing:0.01em;
+  color:#fff; background:var(--oxblood); text-decoration:none;
+  padding:8px 14px; border-radius:6px; border:1px solid var(--oxblood);
+  box-shadow:0 6px 16px -10px rgba(123,45,38,0.7); }
+.hd-gl:hover { background:var(--oxblood-2); border-color:var(--oxblood-2); }
 .gl-card { max-width:680px; }
 .gl-bd { padding:6px 22px 22px; }
 .gl-h { font-family:var(--mono); font-size:10px; letter-spacing:0.2em; text-transform:uppercase;
