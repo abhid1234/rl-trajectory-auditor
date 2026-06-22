@@ -244,6 +244,7 @@ function renderInspector() {
         <span class="beat" id="beat"></span>
         <button id="g-next" title="next moment">Next ›</button>
         <button id="g-walk" class="run" title="auto-play the key moments">▶ Walk me through it</button>
+        <a class="gl-open gnav-gl" href="#" title="every term &amp; color explained (g)">📖 terms?</a>
       </div>
     </div>
 

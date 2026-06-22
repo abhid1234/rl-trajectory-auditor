@@ -337,6 +337,9 @@ body.simple .guide { display:block; padding:16px 22px 18px; border-bottom:1px so
 .guide-nav button.run { background:var(--oxblood); color:#fff; border-color:var(--oxblood); margin-left:4px; font-weight:700; }
 .guide-nav button.run:hover { background:var(--oxblood-2); }
 .beat { font-family:var(--mono); font-size:11px; color:var(--ink-soft); min-width:96px; text-align:center; }
+.gnav-gl { font-family:var(--mono); font-size:12px; font-weight:700; color:var(--oxblood);
+  text-decoration:none; padding:8px 12px; border:1px dashed rgba(123,45,38,0.5); border-radius:4px; }
+.gnav-gl:hover { background:rgba(123,45,38,0.08); border-style:solid; }
 
 /* Simple mode hides the dense expert chrome */
 body.simple .ctrl, body.simple .minimap, body.simple .inspect { display:none; }
